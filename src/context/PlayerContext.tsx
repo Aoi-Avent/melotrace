@@ -30,169 +30,24 @@ import {
 } from '../utils/cloudSync';
 import { saveTracksToDB, putTracksToDB, deleteTracksFromDB, loadTracksFromDB, savePlaylistsToDB, loadPlaylistsFromDB, clearDB } from '../utils/db';
 
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
+import type { PlayerContextType, PlayMetric } from './playerTypes';
+import {
+  STORAGE_KEY_TRACKS,
+  STORAGE_KEY_PLAYLISTS,
+  STORAGE_KEY_IS_DEMO,
+  STORAGE_KEY_BANNED_ARTISTS,
+  STORAGE_KEY_FAV_ARTISTS,
+  STORAGE_KEY_BANNED_TRACKS,
+  STORAGE_KEY_STRICTNESS,
+  STORAGE_KEY_LAST_TRACK_ID,
+  STORAGE_KEY_LAST_QUEUE_IDS,
+  YT_HISTORY_KEY,
+  LOCAL_MODIFIED_KEY,
+  SYNC_BASE_KEY,
+} from './playerConstants';
+import { pickPlayableIndex, nowIso, nowLabel, readBase, writeBase } from './playerUtils';
 
-interface PlayerContextType {
-  tracks: MusicTrack[];
-  activeTracks: MusicTrack[];
-  musicTracks: MusicTrack[];
-  bgmTracks: MusicTrack[];
-  playlists: Playlist[];
-  currentTrack: MusicTrack | null;
-  isPlaying: boolean;
-  playbackRate: number;
-  queue: MusicTrack[];
-  queueIndex: number;
-  repeatMode: RepeatMode;
-  isShuffle: boolean;
-  sleepTimerMinutes: number | null;
-  isNowPlayingOpen: boolean;
-  ytPlayerReady: boolean;
-  nowPlayingTab: 'video' | 'lyrics' | 'art' | 'queue';
-  isDemoMode: boolean;
-  isLoadingLyrics: boolean;
-  bannedArtists: string[];
-  bannedTracks: string[];
-  strictnessMode: 'strict' | 'standard' | 'all';
-  selectedArtistForDetail: string | null;
-  setSelectedArtistForDetail: (artist: string | null) => void;
-  setStrictnessMode: (mode: 'strict' | 'standard' | 'all') => void;
-  banArtist: (artist: string) => void;
-  unbanArtist: (artist: string) => void;
-  favoriteArtists: string[];
-  toggleFavoriteArtist: (artist: string) => void;
-  banTrack: (trackId: string) => void;
-  unbanTrack: (trackId: string) => void;
-  clearAllBans: () => void;
-  setCustomLyrics: (trackId: string, lyrics: string) => void;
-  setNowPlayingTab: (tab: 'video' | 'lyrics' | 'art' | 'queue') => void;
-  isBuffering: boolean;
-  isAdPlaying: boolean;
-  playTrack: (track: MusicTrack, newQueue?: MusicTrack[], shouldOpenModal?: boolean) => void;
-  playBgmStation: () => void;
-  togglePlay: () => void;
-  nextTrack: () => void;
-  prevTrack: () => void;
-  seekTo: (sec: number) => void;
-  setPlaybackRate: (rate: number) => void;
-  setRepeatMode: (mode: RepeatMode) => void;
-  setIsShuffle: (shuffle: boolean) => void;
-  setSleepTimer: (minutes: number | null) => void;
-  toggleFavorite: (trackId: string) => void;
-  setIsNowPlayingOpen: (open: boolean) => void;
-  loadDemoData: () => void;
-  importTracks: (newTracks: MusicTrack[]) => void;
-  addSingleTrackByUrl: (urlOrId: string, customTitle?: string, customArtist?: string) => boolean;
-  clearAllData: () => void;
-  createPlaylist: (name: string, description?: string, color?: string, initialTrackIds?: string[]) => Playlist;
-  updatePlaylist: (playlistId: string, updates: Partial<Playlist>) => void;
-  deletePlaylist: (playlistId: string) => void;
-  addTrackToPlaylist: (playlistId: string, trackId: string) => void;
-  removeTrackFromPlaylist: (playlistId: string, trackId: string) => void;
-  resyncPlayer: () => void;
-  unmuteAudio: () => void;
-  volume: number;
-  setVolume: (v: number) => void;
-  isPlayerMuted: boolean;
-  // Lyrics offset & display mode
-  lyricsOffset: number;
-  adjustLyricsOffset: (delta: number) => void;
-  resetLyricsOffset: () => void;
-  lyricsDisplayMode: LyricsDisplayMode;
-  setLyricsDisplayMode: (mode: LyricsDisplayMode) => void;
-  // Artwork aspect ratio
-  artworkAspectRatio: ArtworkAspectRatio;
-  setArtworkAspectRatio: (ratio: ArtworkAspectRatio) => void;
-  // Retro Player (iPod / Walkman)
-  isRetroPlayerOpen: boolean;
-  setIsRetroPlayerOpen: (open: boolean) => void;
-  retroPlayerSkin: 'ipod' | 'walkman';
-  setRetroPlayerSkin: (skin: 'ipod' | 'walkman') => void;
-  // Background Guide
-  isBgGuideOpen: boolean;
-  setIsBgGuideOpen: (open: boolean) => void;
-  // Cloud & Account
-  currentUser: UserAccount | null;
-  loginWithGoogle: () => Promise<void>;
-  logout: () => void;
-  isCloudSyncing: boolean;
-  syncWithCloud: () => Promise<void>;
-  cloudConfigured: boolean;
-  cloudError: string | null;
-  // YouTube側の視聴履歴にも記録させる（埋め込みをyoutube.com経由にする。反映には再読み込みが必要）
-  recordYtHistory: boolean;
-  setRecordYtHistory: (v: boolean) => void;
-  cloudMessage: string | null;
-  forceCloudSync: (mode: 'push' | 'pull') => Promise<void>;
-  // Playback robustness
-  playbackHint: string | null;
-  dismissPlaybackHint: () => void;
-  keepAliveEnabled: boolean;
-  setKeepAliveEnabled: (v: boolean) => void;
-  // Theme
-  themeId: string;
-  setThemeId: (id: string) => void;
-  // Artist verification / filter
-  artistFilterMode: 'all' | 'official';
-  setArtistFilterMode: (m: 'all' | 'official') => void;
-  artistStatus: (artist: string) => 'verified' | 'unverified' | 'unknown';
-  setArtistOverride: (artist: string, v: 'official' | 'exclude' | null) => void;
-  verifyProgress: { done: number; total: number };
-  // Album art
-  artworkSource: 'album' | 'youtube';
-  setArtworkSource: (s: 'album' | 'youtube') => void;
-  albumArtFor: (trackId: string) => { url: string; album: string } | null;
-  albumArtState: (trackId: string) => 'found' | 'none' | 'unknown';
-  retryAlbumArt: (track: MusicTrack) => void;
-  // Diagnostics
-  playMetrics: PlayMetric[];
-  playWait: { phase: 'idle' | 'loading' | 'slow' | 'ad' | 'retry'; ms: number };
-  retryPlayback: () => void;
-  getPlaybackLog: () => string[];
-  clearPlaybackLog: () => void;
-  restartPlayer: () => void;
-  isUnplayable: (id: string) => boolean;
-  playbackHintLink: string | null;
-}
-
-export interface PlayMetric {
-  id: string;
-  title: string;
-  ms: number; // タップから曲が鳴り始めるまで
-  adMs: number; // そのうち広告にかかった時間
-  at: string;
-  auto?: boolean; // 前の曲が終わって自動で次へ進んだか（false = 手動でタップ）
-  hidden?: boolean; // 要求した時点で画面が非表示（ロック中・ホーム画面）だったか
-  mode?: string; // 映像モード（normal / quiet）
-}
-
-/** 再生できないと分かっている曲を飛ばして、次（または前）の曲の位置を選ぶ */
-function pickPlayableIndex(queue: MusicTrack[], from: number, dir: 1 | -1, shuffle: boolean, bad: Set<string>): number {
-  const n = queue.length;
-  for (let tries = 0; tries < Math.min(n, 30); tries++) {
-    const idx = shuffle && dir === 1 ? Math.floor(Math.random() * n) : (((from + dir * (tries + 1)) % n) + n) % n;
-    if (!bad.has(queue[idx].id)) return idx;
-  }
-  return (((from + dir) % n) + n) % n;
-}
-
-const STORAGE_KEY_TRACKS = 'melotrace_tracks_v5';
-const STORAGE_KEY_PLAYLISTS = 'melotrace_playlists_v5';
-const STORAGE_KEY_IS_DEMO = 'melotrace_is_demo_v5';
-const STORAGE_KEY_BANNED_ARTISTS = 'melotrace_banned_artists_v1';
-const STORAGE_KEY_FAV_ARTISTS = 'melotrace_favorite_artists_v1';
-const STORAGE_KEY_BANNED_TRACKS = 'melotrace_banned_tracks_v1';
-const STORAGE_KEY_STRICTNESS = 'melotrace_strictness_v1';
-const STORAGE_KEY_LAST_TRACK_ID = 'melotrace_last_track_id_v5';
-const STORAGE_KEY_LAST_QUEUE_IDS = 'melotrace_last_queue_ids_v5';
-const YT_HISTORY_KEY = 'melotrace_record_yt_history_v1';
-const LOCAL_MODIFIED_KEY = 'melotrace_local_modified_v1';
-const SYNC_BASE_KEY = 'melotrace_sync_base_v1';
+export type { PlayMetric };
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
@@ -2030,9 +1885,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const cloudFileIdRef = useRef<string | null>(null);
   const syncingRef = useRef(false);
 
-  const nowIso = () => new Date().toISOString();
-  const nowLabel = () =>
-    new Date().toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 
   const syncSettings = useMemo(
     () => ({ strictnessMode, lyricsDisplayMode, artworkAspectRatio, retroPlayerSkin, themeId, artistFilterMode, artworkSource, favoriteArtists }),
@@ -2047,19 +1899,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // 同期処理から最新の状態を読むための参照
   const latestRef = useRef({ tracks, bannedArtists, bannedTracks, playlists, settings: syncSettings, isDemoMode, sig: syncSignature });
   latestRef.current = { tracks, bannedArtists, bannedTracks, playlists, settings: syncSettings, isDemoMode, sig: syncSignature };
-
-  const readBase = (): SyncBase | null => {
-    try {
-      const v = JSON.parse(localStorage.getItem(SYNC_BASE_KEY) || 'null');
-      if (v && typeof v.hash === 'string' && typeof v.rev === 'string') return v;
-    } catch (e) {}
-    return null;
-  };
-  const writeBase = (hash: string, rev: string) => {
-    try {
-      localStorage.setItem(SYNC_BASE_KEY, JSON.stringify({ hash, rev }));
-    } catch (e) {}
-  };
 
   const applyState = useCallback((a: ApplyState) => {
     setTracks(a.tracks);

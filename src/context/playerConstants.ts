@@ -1,0 +1,12 @@
+export const STORAGE_KEY_TRACKS = 'melotrace_tracks_v5';
+export const STORAGE_KEY_PLAYLISTS = 'melotrace_playlists_v5';
+export const STORAGE_KEY_IS_DEMO = 'melotrace_is_demo_v5';
+export const STORAGE_KEY_BANNED_ARTISTS = 'melotrace_banned_artists_v1';
+export const STORAGE_KEY_FAV_ARTISTS = 'melotrace_favorite_artists_v1';
+export const STORAGE_KEY_BANNED_TRACKS = 'melotrace_banned_tracks_v1';
+export const STORAGE_KEY_STRICTNESS = 'melotrace_strictness_v1';
+export const STORAGE_KEY_LAST_TRACK_ID = 'melotrace_last_track_id_v5';
+export const STORAGE_KEY_LAST_QUEUE_IDS = 'melotrace_last_queue_ids_v5';
+export const YT_HISTORY_KEY = 'melotrace_record_yt_history_v1';
+export const LOCAL_MODIFIED_KEY = 'melotrace_local_modified_v1';
+export const SYNC_BASE_KEY = 'melotrace_sync_base_v1';
