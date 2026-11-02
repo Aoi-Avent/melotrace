@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
+  schedule:
+    # 1日1回（日本時間 5:00）。人気の音楽チャートを取り直して再デプロイする
+    - cron: '0 20 * * *'
 
 permissions:
   contents: read
@@ -31,6 +34,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
+
+      - name: Fetch charts (YouTube Data API)
+        # 失敗してもデプロイは続行する（charts.json が無ければアプリは棚を出さない）
+        continue-on-error: true
+        run: node scripts/fetch-charts.mjs
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
 
       - name: Build project
         run: npm run build
