@@ -647,3 +647,52 @@ export async function getPopularMusicVideos(
     return videos;
   });
 }
+
+/* ------------------------------------------------------------------ */
+/* URL取り込み用（T2）                                                   */
+/* ------------------------------------------------------------------ */
+
+export interface YtPlaylistPage {
+  items: YtPlaylistVideo[];
+  /** 次のページがなければ undefined */
+  nextPageToken?: string;
+}
+
+/**
+ * プレイリストを1ページ（最大50件=1ユニット）だけ取得する。キャッシュは使わない。
+ * 進捗表示やキャンセルのため、ページ送りは呼び出し側で行う。
+ */
+export async function getPlaylistPage(playlistId: string, pageToken?: string): Promise<YtPlaylistPage> {
+  const data = await callApi('playlistItems', {
+    part: 'snippet,contentDetails',
+    playlistId,
+    maxResults: 50,
+    pageToken,
+  });
+  const items: YtPlaylistVideo[] = [];
+  for (const it of data.items || []) {
+    const sn = it.snippet || {};
+    const videoId: string = it.contentDetails?.videoId || sn.resourceId?.videoId || '';
+    if (!videoId || sn.title === 'Private video' || sn.title === 'Deleted video') continue;
+    items.push({
+      videoId,
+      title: sn.title || '',
+      channelId: sn.videoOwnerChannelId || '',
+      channelTitle: sn.videoOwnerChannelTitle || '',
+      thumbnail: pickThumb(sn.thumbnails),
+      publishedAt: it.contentDetails?.videoPublishedAt || '',
+      position: typeof sn.position === 'number' ? sn.position : items.length,
+    });
+  }
+  return { items, nextPageToken: data.nextPageToken || undefined };
+}
+
+/** @ハンドル（forHandle）または旧ユーザー名（forUsername）からチャンネルを1件引く。見つからなければ null。 */
+export async function findChannel(by: { handle: string } | { username: string }): Promise<YtChannel | null> {
+  const params: Params = { part: 'snippet,statistics,contentDetails', maxResults: 1 };
+  if ('handle' in by) params.forHandle = by.handle.startsWith('@') ? by.handle : `@${by.handle}`;
+  else params.forUsername = by.username;
+  const data = await callApi('channels', params);
+  const it = (data.items || [])[0];
+  return it ? mapChannel(it) : null;
+}

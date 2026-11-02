@@ -1729,6 +1729,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [playTrack]
   );
 
+  const appendTracks = useCallback(
+    (newTracks: MusicTrack[]): void => {
+      if (!newTracks || newTracks.length === 0) return;
+      setTracks((prev) => {
+        const base = isDemoMode ? [] : prev;
+        const have = new Set(base.map((t) => t.id));
+        const fresh = newTracks.filter((t) => !have.has(t.id));
+        return fresh.length ? [...fresh, ...base] : base;
+      });
+      if (isDemoMode) setIsDemoMode(false);
+    },
+    [isDemoMode]
+  );
+
   const clearAllData = useCallback(() => {
     wantPlayingRef.current = false;
     if (ytPlayerRef.current?.pauseVideo) {
@@ -2154,6 +2168,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         loadDemoData,
         importTracks,
         addSingleTrackByUrl,
+        appendTracks,
         clearAllData,
         createPlaylist,
         updatePlaylist,

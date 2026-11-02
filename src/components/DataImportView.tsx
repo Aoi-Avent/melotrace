@@ -39,6 +39,7 @@ import { saveTextFile } from '../utils/nativeFile';
 import { isNativeApp } from '../utils/platform';
 import { ThumbSettings } from './ThumbSettings';
 import { YoutubeUsageNote } from './YoutubeUsageNote';
+import { YoutubeUrlImport } from './YoutubeUrlImport';
 
 const GITHUB_ACTIONS_WORKFLOW_YAML = `name: Deploy to GitHub Pages
 
@@ -500,6 +501,9 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
           </div>
         </div>
       </section>
+
+      {/* YouTube URL（プレイリスト／チャンネル）取り込み */}
+      <YoutubeUrlImport />
 
       {/* SECTION 3: GOOGLE TAKEOUT JSON IMPORT */}
       {/* SECTION 2: JSON BACKUP & RESTORE */}

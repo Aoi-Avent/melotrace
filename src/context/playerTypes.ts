@@ -65,6 +65,8 @@ export interface PlayerContextType {
   loadDemoData: () => void;
   importTracks: (newTracks: MusicTrack[]) => void;
   addSingleTrackByUrl: (urlOrId: string, customTitle?: string, customArtist?: string) => boolean;
+  /** 再生を始めずにライブラリへ追加する（既存の曲は上書きせず、新しい曲だけ先頭に足す） */
+  appendTracks: (newTracks: MusicTrack[]) => void;
   clearAllData: () => void;
   createPlaylist: (name: string, description?: string, color?: string, initialTrackIds?: string[]) => Playlist;
   updatePlaylist: (playlistId: string, updates: Partial<Playlist>) => void;
