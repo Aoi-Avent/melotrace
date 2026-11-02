@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Search, ArrowDownUp, Heart, Play, BadgeCheck, Star } from 'lucide-react';
+import { Search, Heart, BadgeCheck, Star, ChevronRight } from 'lucide-react';
+import { PageHeader } from './PageHeader';
 import { usePlayer } from '../context/PlayerContext';
 import { ArtistSummary, MusicTrack } from '../types/music';
 import { BackgroundPlayButton } from './BackgroundGuide';
@@ -20,10 +21,10 @@ const SORTS: { key: ArtistSortKey; label: string; defaultDir: Dir }[] = [
 const collator = new Intl.Collator('ja', { sensitivity: 'base', numeric: true });
 const STORAGE_KEY = 'melotrace_artists_sort_v1';
 
-export const ArtistsView: React.FC = () => {
+export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOnly = false }) => {
   const { musicTracks, setSelectedArtistForDetail, playTrack, artistStatus, setArtistOverride, favoriteArtists, toggleFavoriteArtist } = usePlayer();
   const [query, setQuery] = useState('');
-  const [favOnly, setFavOnly] = useState(false);
+  const favOnly = favoritesOnly;
   const favSet = useMemo(() => new Set(favoriteArtists), [favoriteArtists]);
   const [sortKey, setSortKey] = useState<ArtistSortKey>(() => {
     try {
@@ -119,47 +120,26 @@ export const ArtistsView: React.FC = () => {
   };
 
   return (
-    <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto mt-stagger">
-      <header className="pt-2 pb-2">
-        <h1 className="text-2xl font-bold text-fg">アーティスト</h1>
-        <p className="text-xs text-muted mt-0.5">{list.length} 組</p>
-        <BackgroundPlayButton compact className="mt-2" />
-        <ArtistFilterToggle className="mt-2" />
-      </header>
-
-      <div className="flex items-center gap-1 p-1 rounded-xl bg-fg/10 mb-3">
-        <button
-          onClick={() => setFavOnly(false)}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors ${!favOnly ? 'bg-fg text-inverse' : 'text-fg/70'}`}
-        >
-          すべて
-        </button>
-        <button
-          onClick={() => setFavOnly(true)}
-          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${favOnly ? 'bg-fg text-inverse' : 'text-fg/70'}`}
-        >
-          <Star className={`w-3.5 h-3.5 ${favOnly ? 'fill-current' : ''}`} />
-          お気に入り ({favCount})
-        </button>
-      </div>
+    <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
+      <PageHeader title={favOnly ? 'お気に入りのアーティスト' : 'アーティスト'} onBack subtitle={`${list.length} 組`} />
 
       <div className="relative mb-3">
-        <Search className="w-4 h-4 text-muted absolute left-3 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="アーティスト・チャンネルを検索"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+          className="w-full pl-10 pr-3 py-2.5 rounded-full mt-soft text-[15px] text-fg placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
 
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-3 -mx-1 px-1 scrollbar-none">
         {SORTS.map((s) => (
           <button
             key={s.key}
             onClick={() => update(s.key, sortKey === s.key ? (dir === 'asc' ? 'desc' : 'asc') : s.defaultDir)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 transition-colors ${
-              sortKey === s.key ? 'bg-fg text-inverse' : 'bg-fg/10 text-fg/80'
+            className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-semibold flex items-center gap-1 transition-colors ${
+              sortKey === s.key ? 'bg-fg text-inverse' : 'mt-soft text-fg/85'
             }`}
           >
             {s.label}
@@ -167,79 +147,62 @@ export const ArtistsView: React.FC = () => {
           </button>
         ))}
       </div>
-      <p className="text-[10px] text-muted mb-2 flex items-center gap-1">
-        <ArrowDownUp className="w-3 h-3" />選択中のボタンをもう一度押すと昇順／降順が切り替わります
-      </p>
 
-      <div className="flex flex-col gap-1.5 mt-stagger">
-        {list.map((a) => (
-          <div
-            key={a.name}
-            onClick={() => setSelectedArtistForDetail(a.name)}
-            className="flex items-center gap-3 p-2.5 rounded-xl apple-card hover:bg-white/[0.08] cursor-pointer active:scale-[0.99] transition-all"
-          >
-            <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-2 shrink-0">
-              {a.thumbnailUrl && (
-                <img
-                  src={a.thumbnailUrl}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  className="w-full h-full object-cover mt-focus"
-                />
-              )}
+      <div className="flex flex-col mt-stagger">
+        {list.map((a) => {
+          const verified = artistStatus(a.name) === 'verified';
+          return (
+            <div
+              key={a.name}
+              onClick={() => setSelectedArtistForDetail(a.name)}
+              className="relative flex items-center gap-3 py-2.5 cursor-pointer active:opacity-60 transition-opacity"
+            >
+              <div className="w-[54px] h-[54px] rounded-full overflow-hidden bg-surface-2 shrink-0">
+                {a.thumbnailUrl && (
+                  <img src={a.thumbnailUrl} alt="" referrerPolicy="no-referrer" loading="lazy" className="w-full h-full object-cover mt-focus" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-[17px] font-medium text-fg truncate flex items-center gap-1.5">
+                  <span className="truncate">{a.name}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(verified ? `「${a.name}」を公式アーティストから外しますか？` : `「${a.name}」を公式アーティストとして扱いますか？`)) {
+                        setArtistOverride(a.name, verified ? 'exclude' : 'official');
+                      }
+                    }}
+                    className="shrink-0"
+                    aria-label="公式かどうかを手動で変更"
+                  >
+                    <BadgeCheck className={`w-4 h-4 ${verified ? 'text-accent' : 'text-fg/20'}`} />
+                  </button>
+                </h4>
+                <p className="text-[13px] text-muted truncate flex items-center gap-1">
+                  {sortKey === 'favorites' && <Heart className="w-3 h-3 text-accent fill-accent" />}
+                  {subtitle(a)}
+                </p>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavoriteArtist(a.name);
+                }}
+                className={`w-9 h-9 flex items-center justify-center shrink-0 transition-colors ${favSet.has(a.name) ? 'text-accent' : 'text-fg/40'}`}
+                aria-label={favSet.has(a.name) ? 'お気に入りを解除' : 'お気に入りに追加'}
+              >
+                <Star className={`w-[20px] h-[20px] ${favSet.has(a.name) ? 'fill-current' : ''}`} />
+              </button>
+              <ChevronRight className="w-4 h-4 text-muted shrink-0 -ml-1" />
+              <span className="absolute left-[66px] right-0 bottom-0 h-px bg-fg/10" />
             </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-semibold text-fg truncate flex items-center gap-1">
-                {a.name}
-                {artistStatus(a.name) === 'verified' && <BadgeCheck className="w-3.5 h-3.5 text-accent shrink-0" aria-label="実在するアーティスト" />}
-              </h4>
-              <p className="text-[11px] text-muted truncate flex items-center gap-1">
-                {sortKey === 'favorites' && <Heart className="w-3 h-3 text-accent fill-accent" />}
-                {subtitle(a)}
-              </p>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavoriteArtist(a.name);
-              }}
-              className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                favSet.has(a.name) ? 'bg-accent/20 text-accent' : 'bg-fg/5 text-muted'
-              }`}
-              aria-label={favSet.has(a.name) ? 'お気に入りを解除' : 'お気に入りに追加'}
-            >
-              <Star className={`w-3.5 h-3.5 ${favSet.has(a.name) ? 'fill-current' : ''}`} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const verified = artistStatus(a.name) === 'verified';
-                if (window.confirm(verified ? `「${a.name}」を公式アーティストから外しますか？` : `「${a.name}」を公式アーティストとして扱いますか？`)) {
-                  setArtistOverride(a.name, verified ? 'exclude' : 'official');
-                }
-              }}
-              className="w-8 h-8 rounded-full bg-fg/5 text-muted flex items-center justify-center shrink-0"
-              aria-label="公式かどうかを手動で変更"
-            >
-              <BadgeCheck className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const sorted: MusicTrack[] = [...a.tracks].sort((x, y) => (y.playCount || 0) - (x.playCount || 0));
-                playTrack(sorted[0], sorted);
-              }}
-              className="w-8 h-8 rounded-full bg-fg/10 text-fg flex items-center justify-center shrink-0"
-              aria-label={`${a.name}を再生`}
-            >
-              <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-            </button>
-          </div>
-        ))}
+          );
+        })}
         {list.length === 0 && (
-          <p className="text-xs text-muted text-center py-10">
-            {favOnly && !query ? 'お気に入りのアーティストはまだいません。各アーティストの ☆ を押すと追加できます。' : '該当するアーティストがいません。'}
+          <p className="text-[14px] text-muted text-center py-16 px-6 leading-relaxed">
+            {favOnly && !query
+              ? 'お気に入りのアーティストはまだいません。アーティスト一覧の ☆ を押すと追加できます。'
+              : '該当するアーティストがいません。'}
           </p>
         )}
       </div>

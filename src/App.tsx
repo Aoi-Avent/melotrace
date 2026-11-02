@@ -5,8 +5,7 @@
 
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { PlayerProvider, usePlayer } from './context/PlayerContext';
-import { BottomNav } from './components/BottomNav';
-import { MiniPlayer } from './components/MiniPlayer';
+import { AppChrome } from './components/AppChrome';
 import { NowPlayingModal } from './components/NowPlayingModal';
 import { HomeView } from './components/HomeView';
 import { RadioView } from './components/RadioView';
@@ -14,6 +13,8 @@ import { LibraryView } from './components/LibraryView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { DataImportView } from './components/DataImportView';
 import { ArtistsView } from './components/ArtistsView';
+import { LibraryRoot } from './components/LibraryRoot';
+import { useNav, navSetTab, navBack, installChromeScroll } from './utils/nav';
 import { RetroPlayer } from './components/RetroPlayer';
 import { BackgroundGuideModal } from './components/BackgroundGuide';
 import { PlaybackToast } from './components/PlaybackToast';
@@ -87,20 +88,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-const STORAGE_KEY_ACTIVE_TAB = 'melotrace_active_tab_v5';
-
 const AppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_ACTIVE_TAB) as ActiveTab;
-      if (saved && ['home', 'radio', 'library', 'artists', 'search', 'analytics', 'import'].includes(saved)) {
-        return saved;
-      }
-    } catch (e) {
-      // ignore
-    }
-    return 'home';
-  });
+  // 画面の移動は utils/nav.ts のストアで管理（下のタブ・ライブラリの階層・設定ページ）
+  const nav = useNav();
+  const activeTab = nav.tab;
+  const setActiveTab = navSetTab;
 
   const {
     isPlaying,
@@ -112,14 +104,10 @@ const AppContent: React.FC = () => {
     setSelectedArtistForDetail,
   } = usePlayer();
 
-  // Save activeTab whenever changed
+  // 下のバーを、スクロールに合わせてたたむ・広げる
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE_TAB, activeTab);
-    } catch (e) {
-      // ignore
-    }
-  }, [activeTab]);
+    installChromeScroll();
+  }, []);
 
   // Permanently eliminate iOS Safari rubberband bounce
   useEffect(() => {
@@ -137,7 +125,7 @@ const AppContent: React.FC = () => {
   useLayoutEffect(() => {
     const el = mainRef.current?.querySelector('.ios-scroll-container') as HTMLElement | null;
     if (!el) return;
-    const key = activeTab;
+    const key = `${activeTab}:${nav.lib}`;
     const target = scrollMem.get(key) ?? 0;
     el.scrollTop = target;
     // 一覧が遅れて描画される場合に備えて、数フレームのあいだ位置を合わせ直す
@@ -160,7 +148,7 @@ const AppContent: React.FC = () => {
       cancelAnimationFrame(raf);
       el.removeEventListener('scroll', onScroll);
     };
-  }, [activeTab]);
+  }, [activeTab, nav.lib]);
 
   const isVideoVisible = isNowPlayingOpen && nowPlayingTab === 'video';
 
@@ -217,11 +205,15 @@ const AppContent: React.FC = () => {
 
       {/* Main View Area with zero-bounce scrolling */}
       <main ref={mainRef} className="flex-1 w-full max-w-lg mx-auto h-full overflow-hidden relative">
-        <div key={activeTab} className="h-full mt-tab-in">
+        <div key={`${activeTab}:${nav.lib}`} className="h-full mt-tab-in">
         {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} />}
         {activeTab === 'radio' && <RadioView />}
-        {activeTab === 'library' && <LibraryView />}
-        {activeTab === 'artists' && <ArtistsView />}
+        {activeTab === 'library' && nav.lib === 'root' && <LibraryRoot />}
+        {activeTab === 'library' && ['all', 'vocaloid', 'bgm', 'favorites', 'playlists'].includes(nav.lib) && (
+          <LibraryView section={nav.lib as 'all' | 'vocaloid' | 'bgm' | 'favorites' | 'playlists'} />
+        )}
+        {activeTab === 'library' && nav.lib === 'artists' && <ArtistsView />}
+        {activeTab === 'library' && nav.lib === 'favArtists' && <ArtistsView favoritesOnly />}
         {activeTab === 'search' && (
           <SearchView onSelectArtist={(artist) => setSelectedArtistForDetail(artist)} />
         )}
@@ -233,14 +225,12 @@ const AppContent: React.FC = () => {
       {/* Global Quick Recovery & Audio Resync */}
       <QuickRecoveryModal />
 
-      {/* Apple Music Floating Mini Player */}
-      <MiniPlayer />
 
       {/* Apple Music Full-Screen Now Playing Modal Sheet */}
       <NowPlayingModal />
 
       <Mascot />
-      {!isNativeApp() && <AdTip onOpen={() => setActiveTab('import')} />}
+      {!isNativeApp() && <AdTip onOpen={() => navSetTab('import')} />}
       <PlaybackToast />
       <DesktopModeBanner />
       <RetroPlayer />
@@ -252,8 +242,8 @@ const AppContent: React.FC = () => {
         onClose={() => setSelectedArtistForDetail(null)}
       />
 
-      {/* Apple Music 5-Tab Bottom Navigation Bar */}
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* 下に浮かぶ、ガラスのタブバーとミニプレイヤー */}
+      <AppChrome />
     </div>
   );
 };

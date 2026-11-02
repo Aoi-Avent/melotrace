@@ -126,7 +126,8 @@ export const THEME_GROUP_LABELS: Record<ThemeGroup, string> = {
   light: 'ライト',
 };
 
-export const DEFAULT_THEME_ID = 'blue';
+export const DEFAULT_THEME_ID = 'red';
+const MUSIC_MIGRATE_KEY = 'melotrace_theme_music_v1';
 export const THEME_STORAGE_KEY = 'melotrace_theme_v1';
 const VARS_KEY = 'melotrace_theme_vars_v1';
 
@@ -136,6 +137,12 @@ export function getTheme(id: string | null | undefined): ThemeDef {
 
 export function getSavedThemeId(): string {
   try {
+    // 新しいUI（ミュージック風）に切り替わった最初の1回だけ、赤のテーマにする。以後は自分で選んだテーマを保つ
+    if (!localStorage.getItem(MUSIC_MIGRATE_KEY)) {
+      localStorage.setItem(MUSIC_MIGRATE_KEY, '1');
+      localStorage.setItem(THEME_STORAGE_KEY, DEFAULT_THEME_ID);
+      return DEFAULT_THEME_ID;
+    }
     const v = localStorage.getItem(THEME_STORAGE_KEY);
     if (v && THEMES.some((t) => t.id === v)) return v;
   } catch (e) {}

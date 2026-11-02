@@ -1,3 +1,4 @@
+import { PageHeader } from './PageHeader';
 import React, { useMemo } from 'react';
 import {
   TrendingUp,
@@ -86,22 +87,8 @@ export const AnalyticsView: React.FC = () => {
   };
 
   return (
-    <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto mt-stagger">
-      {/* Top Header */}
-      <header className="pt-2 pb-1 mb-3">
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="w-2 h-2 rounded-full bg-accent" />
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-            {isDemoMode ? 'サンプル視聴履歴' : 'あなたの視聴履歴データ'}
-          </span>
-        </div>
-        <h1 className="text-3xl font-extrabold text-fg tracking-tight">
-          履歴カルテ
-        </h1>
-        <p className="text-xs text-muted mt-0.5">
-          YouTubeの履歴データから嗜好傾向をプロファイリング
-        </p>
-      </header>
+    <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
+      <PageHeader title="履歴カルテ" onBack subtitle={isDemoMode ? 'サンプル視聴履歴' : 'あなたの視聴履歴データ'} />
 
       {/* Summary KPI Cards (Apple Music Replay style) */}
       <div className="grid grid-cols-3 gap-2.5 mb-6">

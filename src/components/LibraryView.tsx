@@ -16,8 +16,10 @@ import {
   ChevronLeft,
   Shuffle,
   Pencil,
+  MoreHorizontal,
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
+import { PageHeader, GlassPill } from './PageHeader';
 import { MusicTrack } from '../types/music';
 import { libraryMem } from '../utils/viewMemory';
 import {
@@ -39,7 +41,16 @@ const SHOW_ORDER_BANNER = false;
 const SORT_STORAGE_KEY = 'melotrace_library_sort_v2';
 const GROUP_STORAGE_KEY = 'melotrace_library_group_artist_v1';
 
-export const LibraryView: React.FC = () => {
+type LibSection = 'all' | 'vocaloid' | 'bgm' | 'favorites' | 'playlists';
+const SECTION_TITLES: Record<LibSection, string> = {
+  all: '曲',
+  vocaloid: 'ボカロ・歌ってみた',
+  bgm: 'BGM',
+  favorites: 'お気に入りの曲',
+  playlists: 'プレイリスト',
+};
+
+export const LibraryView: React.FC<{ section?: LibSection }> = ({ section }) => {
   const {
     activeTracks,
     musicTracks,
@@ -87,7 +98,7 @@ export const LibraryView: React.FC = () => {
       localStorage.setItem(GROUP_STORAGE_KEY, String(groupArtist));
     } catch (e) {}
   }, [sortRules, groupArtist]);
-  const [activeSubTab, setActiveSubTab] = useState<'all' | 'vocaloid' | 'bgm' | 'favorites' | 'playlists'>(libraryMem.sub);
+  const [activeSubTab, setActiveSubTab] = useState<LibSection>(section ?? libraryMem.sub);
   const [showAddUrlModal, setShowAddUrlModal] = useState(false);
   const [inputUrl, setInputUrl] = useState('');
   const [inputTitle, setInputTitle] = useState('');
@@ -231,87 +242,55 @@ export const LibraryView: React.FC = () => {
 
   return (
     <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto">
-      {/* Top Header */}
-      <header className="flex items-center justify-between pt-2 pb-1 mb-2">
-        <div>
-          <h1 className="text-3xl font-extrabold text-fg tracking-tight">
-            ライブラリ
-          </h1>
-          <BackgroundPlayButton compact className="mt-1.5" />
-          <ArtistFilterToggle className="mt-2" />
-          <p className="text-xs text-muted mt-0.5">
-            {activeTracks.length}曲の音楽コレクション
-          </p>
+      {/* ミュージック風の見出し: 戻る / 大きなタイトル / 再生・シャッフル */}
+      <PageHeader
+        title={SECTION_TITLES[activeSubTab]}
+        onBack
+        actions={
+          activeSubTab === 'playlists' ? (
+            <GlassPill>
+              <button onClick={() => setShowNewPlModal(true)} className="w-11 h-8 flex items-center justify-center" aria-label="プレイリストを作成">
+                <Plus className="w-5 h-5" />
+              </button>
+            </GlassPill>
+          ) : (
+            <GlassPill>
+              <button
+                onClick={() => setShowSortPanel((v) => !v)}
+                className={`w-10 h-8 flex items-center justify-center ${showSortPanel ? 'text-accent' : ''}`}
+                aria-label="並び替え"
+              >
+                <SlidersHorizontal className="w-[18px] h-[18px]" />
+              </button>
+              <button onClick={() => setShowAddUrlModal(true)} className="w-10 h-8 flex items-center justify-center" aria-label="曲を追加">
+                <Plus className="w-5 h-5" />
+              </button>
+            </GlassPill>
+          )
+        }
+      />
+      {activeSubTab !== 'playlists' && (
+        <div className="flex gap-3 mb-4 mt-1">
+          <button
+            onClick={() => displayTracks.length > 0 && playTrack(displayTracks[0], displayTracks)}
+            className="flex-1 h-11 rounded-full mt-soft text-accent text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            再生
+          </button>
+          <button
+            onClick={() => {
+              if (displayTracks.length === 0) return;
+              setIsShuffle(true);
+              playTrack(displayTracks[Math.floor(Math.random() * displayTracks.length)], displayTracks);
+            }}
+            className="flex-1 h-11 rounded-full mt-soft text-accent text-[16px] font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+          >
+            <Shuffle className="w-4 h-4" />
+            シャッフル
+          </button>
         </div>
-
-        <button
-          onClick={() => setShowAddUrlModal(true)}
-          className="w-9 h-9 rounded-full bg-fg/10 hover:bg-fg/20 active:scale-95 text-fg flex items-center justify-center transition-colors"
-          title="曲を追加"
-        >
-          <Plus className="w-5 h-5 text-accent" />
-        </button>
-      </header>
-
-      {/* Segmented Sub-Tab Selector with Vocaloid Tab */}
-      <div className="flex items-center gap-1.5 p-1 bg-surface rounded-xl mb-3 border border-fg/5">
-        <button
-          onClick={() => setActiveSubTab('all')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            activeSubTab === 'all'
-              ? 'bg-surface-2 text-fg shadow-sm'
-              : 'text-muted hover:text-fg'
-          }`}
-        >
-          音楽 ({musicTracks.length})
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('vocaloid')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            activeSubTab === 'vocaloid'
-              ? 'bg-surface-2 text-[#af52de] shadow-sm font-bold'
-              : 'text-muted hover:text-[#af52de]'
-          }`}
-        >
-          ボカロ
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('bgm')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            activeSubTab === 'bgm'
-              ? 'bg-surface-2 text-[#30d158] shadow-sm font-bold'
-              : 'text-muted hover:text-[#30d158]'
-          }`}
-          title="通常シャッフルから隔離された作業用BGM・クラシック"
-        >
-          BGM ({bgmTracks.length})
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('favorites')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 ${
-            activeSubTab === 'favorites'
-              ? 'bg-surface-2 text-fg shadow-sm'
-              : 'text-muted hover:text-fg'
-          }`}
-        >
-          <Heart className="w-3.5 h-3.5 fill-current text-accent" />
-          <span>お気に入り</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('playlists')}
-          className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            activeSubTab === 'playlists'
-              ? 'bg-surface-2 text-fg shadow-sm'
-              : 'text-muted hover:text-fg'
-          }`}
-        >
-          リスト
-        </button>
-      </div>
+      )}
 
       {/* TRACKS LIST VIEW */}
       {activeSubTab !== 'playlists' && (
@@ -324,7 +303,7 @@ export const LibraryView: React.FC = () => {
               placeholder="曲名、アーティスト、ボカロP名で検索"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 rounded-xl bg-surface text-xs text-fg placeholder-[#8e8e93] focus:outline-none focus:ring-1 focus:ring-accent border border-fg/5"
+              className="w-full pl-9 pr-8 py-2.5 rounded-full mt-soft text-[15px] text-fg placeholder-[#8e8e93] focus:outline-none focus:ring-1 focus:ring-accent"
             />
             {searchQuery && (
               <button
@@ -376,15 +355,6 @@ export const LibraryView: React.FC = () => {
                 }`}
               >
                 アーティスト毎
-              </button>
-              <button
-                onClick={() => setShowSortPanel((v) => !v)}
-                className={`px-2 py-1 rounded-full flex items-center gap-1 font-semibold transition-colors ${
-                  showSortPanel ? 'bg-fg text-inverse' : 'bg-fg/10 text-fg/80'
-                }`}
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                並び替え{sortRules.length > 1 ? `（${sortRules.length}段）` : ''}
               </button>
             </div>
           </div>
@@ -452,7 +422,7 @@ export const LibraryView: React.FC = () => {
           )}
 
           {/* iOS Track Rows (Windowed / Infinite Scroll) */}
-          <div className="flex flex-col gap-1.5">
+          <div className="flex flex-col">
             {displayTracks.slice(0, visibleCount).map((track, idx, arr) => {
               const isCurrent = currentTrack?.id === track.id;
               const showGroupHeader = groupArtist && (idx === 0 || arr[idx - 1].artist !== track.artist);
@@ -472,11 +442,9 @@ export const LibraryView: React.FC = () => {
                 <div
                   onClick={() => playTrack(track, displayTracks)}
                   style={idx < 12 ? ({ ['--i' as any]: idx } as React.CSSProperties) : undefined}
-                  className={`${idx < 12 ? 'mt-row-in ' : ''}flex items-center gap-3 p-2.5 rounded-xl apple-card hover:bg-fg/[0.08] cursor-pointer active:scale-[0.99] transition-all group ${
-                    isCurrent ? 'bg-accent/15 border-accent/40' : ''
-                  }`}
+                  className={`${idx < 12 ? 'mt-row-in ' : ''}relative flex items-center gap-3 py-2 cursor-pointer active:opacity-60 transition-opacity group`}
                 >
-                  <div className="relative w-11 h-11 rounded-lg overflow-hidden shrink-0 bg-surface-2">
+                  <div className="relative w-[50px] h-[50px] rounded-[7px] overflow-hidden shrink-0 bg-surface-2">
                     <img
                       src={`https://img.youtube.com/vi/${track.id}/mqdefault.jpg`}
                       alt={track.title}
@@ -497,7 +465,7 @@ export const LibraryView: React.FC = () => {
 
                   <div className="flex-1 min-w-0 pr-1">
                     <h4
-                      className={`text-xs font-semibold truncate leading-snug ${
+                      className={`text-[16px] font-medium truncate leading-snug ${
                         isCurrent ? 'text-accent' : 'text-fg'
                       }`}
                     >
@@ -508,42 +476,24 @@ export const LibraryView: React.FC = () => {
                         e.stopPropagation();
                         setSelectedArtistForDetail(track.artist);
                       }}
-                      className="text-[11px] text-muted hover:text-accent hover:underline truncate mt-0.5 cursor-pointer"
+                      className="text-[14px] text-muted truncate mt-0.5 cursor-pointer"
                       title="アーティスト詳細を開く"
                     >
                       {track.artist}
                     </p>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted mt-0.5">
-                      <span>{track.playCount}回再生</span>
-                      <span>·</span>
-                      <span className={track.genre === 'ボカロ・VOCALOID' ? 'text-[#af52de] font-semibold' : ''}>
-                        {track.genre || 'J-POP'}
-                      </span>
-                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => toggleFavorite(track.id)}
-                      className="p-2 text-muted hover:text-accent transition-colors"
-                      aria-label="お気に入り"
-                    >
-                      <Heart
-                        className={`w-4 h-4 ${
-                          track.isFavorite ? 'text-accent fill-accent' : ''
-                        }`}
-                      />
-                    </button>
-
-                    {/* Track Context Menu (Ban / Hide / Open) */}
+                  <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {track.isFavorite && <Heart className="w-4 h-4 text-accent fill-accent mr-1" />}
                     <button
                       onClick={() => setTargetTrackForMenu(track)}
-                      className="p-2 text-muted hover:text-fg transition-colors"
+                      className="w-10 h-10 flex items-center justify-center text-fg active:opacity-50 transition-opacity"
                       title="メニュー"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreHorizontal className="w-[22px] h-[22px]" />
                     </button>
                   </div>
+                  <span className="absolute left-[62px] right-0 bottom-0 h-px bg-fg/10" />
                 </div>
                 </React.Fragment>
               );
@@ -573,8 +523,8 @@ export const LibraryView: React.FC = () => {
 
       {/* Track Action Bottom Sheet */}
       {targetTrackForMenu && (
-        <div className="fixed inset-0 z-[70] bg-black/80 flex items-end justify-center p-3 animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-2xl apple-card p-4 shadow-2xl border border-fg/10 flex flex-col gap-2">
+        <div className="fixed inset-0 z-[70] bg-black/55 flex items-end justify-center p-3 animate-in fade-in duration-200" onClick={() => setTargetTrackForMenu(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-[28px] lg-glass p-4 flex flex-col gap-2 animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between pb-2 border-b border-fg/10">
               <div className="min-w-0 pr-2">
                 <p className="text-xs font-bold text-fg truncate">{targetTrackForMenu.title}</p>
@@ -584,6 +534,17 @@ export const LibraryView: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            <button
+              onClick={() => {
+                toggleFavorite(targetTrackForMenu.id);
+                setTargetTrackForMenu(null);
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-fg/5 hover:bg-fg/10 text-left text-xs font-semibold text-fg flex items-center gap-2"
+            >
+              <Heart className={`w-4 h-4 text-accent ${targetTrackForMenu.isFavorite ? 'fill-accent' : ''}`} />
+              <span>{targetTrackForMenu.isFavorite ? 'お気に入りから外す' : 'お気に入りに追加'}</span>
+            </button>
 
             <button
               onClick={() => {

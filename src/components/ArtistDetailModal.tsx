@@ -88,7 +88,7 @@ export const ArtistDetailModal: React.FC<ArtistDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/85 flex flex-col justify-end animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[70] bg-black flex flex-col animate-in fade-in slide-in-from-right-8 duration-300">
       {/* Background backdrop blur */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {representativeThumbnail && (
@@ -100,85 +100,66 @@ export const ArtistDetailModal: React.FC<ArtistDetailModalProps> = ({
         )}
       </div>
 
-      <div className="relative z-10 w-full max-w-lg mx-auto animate-in slide-in-from-bottom duration-300 bg-surface/95 border-t border-fg/10 rounded-t-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden pb-[max(env(safe-area-inset-bottom,0px),12px)]">
-        {/* Top Handle / Close Bar */}
-        <div className="flex items-center justify-between px-5 pt-3 pb-2 border-b border-fg/5">
-          <div className="w-8" />
-          <div className="w-10 h-1 bg-fg/20 rounded-full" />
+      <div className="relative z-10 w-full max-w-lg mx-auto h-full flex flex-col overflow-hidden">
+        {/* 戻るボタン（ガラスの丸） */}
+        <div className="absolute z-20 left-4 right-4 flex items-center justify-between" style={{ top: 'max(env(safe-area-inset-top, 0px), 12px)' }}>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-fg/10 flex items-center justify-center text-muted hover:text-fg transition-colors"
+            aria-label="戻る"
+            className="lg-glass w-10 h-10 rounded-full flex items-center justify-center text-fg active:scale-90 transition-transform"
           >
-            <X className="w-4 h-4" />
+            <ChevronDown className="w-5 h-5 rotate-90" />
+          </button>
+          <button
+            onClick={() => toggleFavoriteArtist(artistName)}
+            aria-label={isFavArtist ? 'お気に入りのアーティストを解除' : 'お気に入りのアーティストに追加'}
+            className={`lg-glass w-10 h-10 rounded-full flex items-center justify-center active:scale-90 transition-transform ${isFavArtist ? 'text-accent' : 'text-fg'}`}
+          >
+            <Star key={String(isFavArtist)} className={`w-[18px] h-[18px] ${isFavArtist ? 'fill-current mt-pop' : ''}`} />
           </button>
         </div>
 
         {/* Scrollable Artist Catalog Content */}
-        <div className="overflow-y-auto px-5 pt-4 pb-12 flex-1 ios-scroll-container">
-          {/* Artist Header Profile */}
-          <div className="flex flex-col items-center text-center mb-6">
-            <div className="w-28 h-28 rounded-full overflow-hidden shadow-2xl border-2 border-fg/15 bg-surface-2 mb-3.5 relative">
-              {representativeThumbnail ? (
-                <img
-                  src={representativeThumbnail}
-                  alt={artistName}
-                  className="w-full h-full object-cover mt-focus"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-surface-2">
-                  <Music2 className="w-10 h-10 text-fg/40" />
-                </div>
-              )}
-            </div>
-
-            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-accent/15 text-accent text-[11px] font-semibold mb-1 border border-accent/20">
-              <Sparkles className="w-3 h-3" />
-              <span>ライブラリ収録アーティスト</span>
-            </div>
-
-            <h2 className="text-2xl font-bold text-fg tracking-tight px-4 break-words">
-              {artistName}
-            </h2>
-
-            <p className="text-xs text-muted mt-1">
-              {artistTracks.length}曲 収録 • 合計 {totalPlays} 回再生
-            </p>
-
-            {/* Apple Music Action Buttons */}
-            <div className="flex items-center gap-3 w-full max-w-xs mt-4">
-              <button
-                onClick={() => handlePlayAll(false)}
-                className="flex-1 py-3 px-4 rounded-xl bg-accent hover:bg-accent-hover text-on-accent text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-accent/25 active:scale-95 transition-all"
-              >
-                <Play className="w-4 h-4 fill-white" />
-                <span>すべて再生</span>
-              </button>
-
-              <button
-                onClick={() => handlePlayAll(true)}
-                className="flex-1 py-3 px-4 rounded-xl bg-fg/10 hover:bg-fg/15 text-fg text-xs font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all"
-              >
-                <Shuffle className="w-4 h-4" />
-                <span>シャッフル</span>
-              </button>
-
-              <button
-                onClick={() => toggleFavoriteArtist(artistName)}
-                className={`w-12 shrink-0 py-3 rounded-xl flex items-center justify-center active:scale-95 transition-all ${
-                  isFavArtist ? 'bg-accent/20 text-accent' : 'bg-fg/10 text-fg'
-                }`}
-                aria-label={isFavArtist ? 'お気に入りのアーティストを解除' : 'お気に入りのアーティストに追加'}
-              >
-                <Star key={String(isFavArtist)} className={`w-4 h-4 ${isFavArtist ? 'fill-current mt-pop' : ''}`} />
-              </button>
+        <div className="overflow-y-auto px-5 pt-0 pb-16 flex-1 ios-scroll-container">
+          {/* アーティストのヒーロー（大きな画像・名前・再生） */}
+          <div className="relative -mx-5 mb-6 h-[340px] overflow-hidden">
+            {representativeThumbnail ? (
+              <img src={representativeThumbnail} alt={artistName} className="absolute inset-0 w-full h-full object-cover mt-focus" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-surface-2">
+                <Music2 className="w-16 h-16 text-fg/30" />
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-black/10" />
+            <div className="absolute left-5 right-5 bottom-4">
+              <h2 className="mt-large-title text-white break-words">{artistName}</h2>
+              <p className="text-[13px] text-white/70 mt-1">
+                {artistTracks.length}曲 収録 • 合計 {totalPlays} 回再生
+              </p>
+              <div className="flex items-center gap-3 mt-4">
+                <button
+                  onClick={() => handlePlayAll(false)}
+                  aria-label="すべて再生"
+                  className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center shadow-xl active:scale-90 transition-transform"
+                >
+                  <Play className="w-6 h-6 fill-current ml-0.5" />
+                </button>
+                <button
+                  onClick={() => handlePlayAll(true)}
+                  className="h-11 px-5 rounded-full lg-glass text-fg text-[15px] font-semibold flex items-center gap-2 active:scale-95 transition-transform"
+                >
+                  <Shuffle className="w-4 h-4" />
+                  <span>シャッフル</span>
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Song List */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-bold text-fg tracking-tight">
-                このアーティストの曲 ({artistTracks.length})
+              <h3 className="text-[22px] font-bold text-fg tracking-tight">
+                トップソング ({artistTracks.length})
               </h3>
               <span className="text-[11px] text-muted">再生回数順</span>
             </div>

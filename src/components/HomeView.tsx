@@ -1,3 +1,4 @@
+import { PageHeader } from './PageHeader';
 import React, { useState, useMemo } from 'react';
 import {
   Play,
@@ -99,44 +100,18 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab }) => {
   const visibleMixes = isMixesExpanded ? QUICK_MIXES : QUICK_MIXES.slice(0, 6);
 
   return (
-    <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto mt-stagger">
-      {/* Apple Music Header Strip */}
-      <div className="flex items-center justify-between pt-2 pb-1 border-b border-fg/5 mb-3">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-accent" />
-          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-            {isDemoMode ? 'サンプル体験中' : 'マイライブラリ'}
-          </span>
-        </div>
-
-        {isDemoMode ? (
-          <button
-            onClick={() => setActiveTab('import')}
-            className="flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
-          >
+    <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
+      <PageHeader title="ホーム" />
+      <div className="flex items-center justify-between pb-3">
+        <span className="text-[13px] text-muted">
+          {isDemoMode ? 'サンプル体験中' : `${tracks.length}曲 · 累計${totalPlays}回再生`}
+        </span>
+        {isDemoMode && (
+          <button onClick={() => setActiveTab('import')} className="flex items-center gap-1 text-[13px] font-medium text-accent">
             <span>自分の履歴を取り込む</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
-        ) : (
-          <span className="text-[11px] text-muted">
-            {tracks.length}曲 · 累計{totalPlays}回再生
-          </span>
         )}
-      </div>
-
-      {/* Apple Music Signature Big Title */}
-      <h1 className="text-3xl font-extrabold text-fg tracking-tight mb-4">
-        今すぐ聴く
-      </h1>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <BackgroundPlayButton compact />
-        <button
-          onClick={() => setIsRetroPlayerOpen(true)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-fg/10 hover:bg-fg/15 text-fg text-[11px] font-semibold active:scale-95 transition"
-        >
-          <Disc className="w-3.5 h-3.5 text-[#ff9f0a]" />
-          <span>iPod / Walkman モード</span>
-        </button>
       </div>
 
       {/* Empty / Zero-state banner */}

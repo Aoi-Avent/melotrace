@@ -1,3 +1,4 @@
+import { PageHeader } from './PageHeader';
 import React, { useState } from 'react';
 import { Radio, Play, Sparkles, Flame, Moon, Zap, Coffee, Car, Heart, Music2 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
@@ -35,17 +36,8 @@ export const RadioView: React.FC = () => {
   };
 
   return (
-    <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto mt-stagger">
-      {/* Top Header */}
-      <div className="pt-2 pb-1 mb-2">
-        <h1 className="text-3xl font-extrabold text-fg tracking-tight">
-          ラジオ & ミックス
-        </h1>
-          <BackgroundPlayButton compact className="mt-1.5" />
-        <p className="text-xs text-muted mt-1">
-          全24種類のスマートステーションから今の気分を選ぶ
-        </p>
-      </div>
+    <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
+      <PageHeader title="ラジオ" subtitle="全24種類のスマートステーションから今の気分を選ぶ" />
 
       {/* Category Pills (Apple Music segmented filter) */}
       <div className="flex gap-2 overflow-x-auto pb-3 pt-1 scrollbar-none mb-4 -mx-4 px-4">

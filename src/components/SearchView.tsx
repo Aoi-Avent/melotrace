@@ -13,6 +13,17 @@ import {
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { MusicTrack } from '../types/music';
+import { PageHeader } from './PageHeader';
+
+// 「カテゴリを見る」のタイルの色（ミュージックの検索画面のような、はっきりした色）
+const TILE_GRADIENTS = [
+  'linear-gradient(135deg, #f0405a, #c4223d)',
+  'linear-gradient(135deg, #7b6cf0, #4a3fc4)',
+  'linear-gradient(135deg, #2fc48d, #1b8f6a)',
+  'linear-gradient(135deg, #f5a03a, #d2691e)',
+  'linear-gradient(135deg, #c15cf0, #8a2fc4)',
+  'linear-gradient(135deg, #34b5dc, #1f7fb0)',
+];
 
 interface SearchViewProps {
   onSelectArtist: (artist: string) => void;
@@ -97,29 +108,23 @@ export const SearchView: React.FC<SearchViewProps> = ({ onSelectArtist }) => {
   };
 
   return (
-    <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto mt-stagger">
-      {/* Apple Music Large Header */}
-      <div className="pt-2 pb-1">
-        <h1 className="text-3xl font-extrabold text-fg tracking-tight">検索</h1>
-      </div>
+    <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
+      <PageHeader title="検索" />
 
-      {/* Apple Music Search Input */}
-      <div className="my-3 relative">
-        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-          <SearchIcon className="h-4 w-4 text-muted" />
+      {/* 検索欄 */}
+      <div className="mb-4 relative">
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <SearchIcon className="h-[18px] w-[18px] text-muted" />
         </div>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="曲名、アーティスト、ボカロP、ジャンル"
-          className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-surface text-fg text-sm placeholder-[#8e8e93] border border-fg/10 focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+          className="w-full pl-11 pr-10 py-3 rounded-full mt-soft text-fg text-[16px] placeholder-[#8e8e93] focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
         />
         {query && (
-          <button
-            onClick={() => setQuery('')}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted hover:text-fg"
-          >
+          <button onClick={() => setQuery('')} className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-muted hover:text-fg">
             <div className="w-5 h-5 rounded-full bg-fg/20 flex items-center justify-center">
               <X className="w-3 h-3 text-fg" />
             </div>
@@ -127,27 +132,27 @@ export const SearchView: React.FC<SearchViewProps> = ({ onSelectArtist }) => {
         )}
       </div>
 
-      {/* Category Pills */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {categories.map((cat) => {
-          const isSelected = selectedCategory === cat.filter;
-          return (
-            <button
-              key={cat.filter}
-              onClick={() => {
-                setSelectedCategory(isSelected ? null : cat.filter);
-              }}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${
-                isSelected
-                  ? 'bg-accent text-on-accent shadow-md shadow-accent/30'
-                  : 'bg-surface text-muted hover:text-on-accent border border-fg/5'
-              }`}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* 絞り込みピル（検索中・カテゴリ選択中だけ） */}
+      {(query.trim().length > 0 || selectedCategory) && (
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat.filter;
+            return (
+              <button
+                key={cat.filter}
+                onClick={() => {
+                  setSelectedCategory(isSelected ? null : cat.filter);
+                }}
+                className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                  isSelected ? 'bg-accent text-on-accent' : 'mt-soft text-fg/85'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* SEARCH RESULTS VIEW */}
       {query.trim().length > 0 || selectedCategory ? (
@@ -302,9 +307,26 @@ export const SearchView: React.FC<SearchViewProps> = ({ onSelectArtist }) => {
         </div>
       ) : (
         /* DEFAULT EMPTY SEARCH: EXPLORE ARTISTS & POPULAR GENRES */
-        <div className="mt-4">
-          <div className="mb-6">
-            <h2 className="text-sm font-bold text-fg tracking-tight mb-3">
+        <div className="mt-2">
+          <div className="mb-8">
+            <h2 className="text-[22px] font-bold text-fg tracking-tight mb-3">カテゴリを見る</h2>
+            <div className="grid grid-cols-2 gap-3">
+              {categories.map((cat, i) => (
+                <button
+                  key={cat.filter}
+                  onClick={() => setSelectedCategory(cat.filter)}
+                  className="relative aspect-[16/9] rounded-[14px] overflow-hidden text-left p-3 flex items-end active:scale-95 transition-transform"
+                  style={{ background: TILE_GRADIENTS[i % TILE_GRADIENTS.length] }}
+                >
+                  <Disc3 className="absolute -right-3 -top-3 w-20 h-20 text-white/15" />
+                  <span className="relative text-[17px] font-bold text-white leading-tight">{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-[22px] font-bold text-fg tracking-tight mb-3">
               人気のアーティスト
             </h2>
             <div className="grid grid-cols-2 gap-2.5">
@@ -331,7 +353,7 @@ export const SearchView: React.FC<SearchViewProps> = ({ onSelectArtist }) => {
           </div>
 
           <div>
-            <h2 className="text-sm font-bold text-fg tracking-tight mb-3">
+            <h2 className="text-[22px] font-bold text-fg tracking-tight mb-3">
               最近再生された曲
             </h2>
             <div className="divide-y divide-fg/5">

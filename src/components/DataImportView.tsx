@@ -1,3 +1,4 @@
+import { PageHeader } from './PageHeader';
 import React, { useState } from 'react';
 import {
   Sparkles,
@@ -353,16 +354,8 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
   };
 
   return (
-    <div className="ios-scroll-container pb-36 pt-2 px-4 max-w-lg mx-auto mt-stagger">
-      {/* Top Header */}
-      <header className="pt-2 pb-1 mb-4">
-        <h1 className="text-3xl font-extrabold text-fg tracking-tight">
-          取込 & フィルター管理
-        </h1>
-        <p className="text-xs text-muted mt-0.5">
-          高精度な音楽判定・除外（Ban）設定・広告抑制・データ管理
-        </p>
-      </header>
+    <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
+      <PageHeader title="設定" onBack subtitle="色テーマ・同期・取り込みなど" />
 
       <ThemePicker />
 
