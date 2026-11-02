@@ -76,7 +76,7 @@ export const AppChrome: React.FC = () => {
   return (
     <div
       className="fixed left-0 right-0 z-40 px-3 pointer-events-none"
-      style={{ bottom: 'calc(max(env(safe-area-inset-bottom, 0px) - 13px, 8px) + var(--bottom-gap, 0px))' }}
+      style={{ bottom: 'calc(12px + var(--bottom-gap, 0px))' }}
     >
       <div className="max-w-lg mx-auto relative">
         {/* ふだんの形: ミニプレイヤーの下にタブバー */}
