@@ -38,6 +38,7 @@ import { unzipSync } from 'fflate';
 import { saveTextFile } from '../utils/nativeFile';
 import { isNativeApp } from '../utils/platform';
 import { ThumbSettings } from './ThumbSettings';
+import { YoutubeUsageNote } from './YoutubeUsageNote';
 
 const GITHUB_ACTIONS_WORKFLOW_YAML = `name: Deploy to GitHub Pages
 
@@ -379,6 +380,8 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
       <ThumbSettings />
 
       <AppearanceCard />
+
+      <YoutubeUsageNote />
 
       {!isNativeApp() && <ExtensionGuideCard />}
 

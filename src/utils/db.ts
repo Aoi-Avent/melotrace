@@ -5,11 +5,14 @@
 import { MusicTrack, Playlist } from '../types/music';
 
 const DB_NAME = 'melotrace_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_TRACKS = 'tracks';
 const STORE_PLAYLISTS = 'playlists';
+/** YouTube Data API のキャッシュと日次使用量（youtubeApi.ts 用。clearDB では消さない） */
+export const STORE_YT_CACHE = 'yt_cache';
+export const STORE_YT_USAGE = 'yt_usage';
 
-function openDB(): Promise<IDBDatabase> {
+export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
       reject(new Error('IndexedDB not supported'));
@@ -24,6 +27,12 @@ function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_PLAYLISTS)) {
         db.createObjectStore(STORE_PLAYLISTS, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_YT_CACHE)) {
+        db.createObjectStore(STORE_YT_CACHE, { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains(STORE_YT_USAGE)) {
+        db.createObjectStore(STORE_YT_USAGE, { keyPath: 'date' });
       }
     };
 
