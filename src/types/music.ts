@@ -13,6 +13,8 @@ export interface MusicTrack {
   lyrics?: string; // LRC formatted or plain text
   notes?: string;
   isDemo?: boolean;
+  /** ラジオがキューに足した曲。ライブラリには入れず、再生しても回数・最終再生を変えない */
+  isRadio?: boolean;
 }
 
 export interface Playlist {

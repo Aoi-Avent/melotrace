@@ -39,6 +39,7 @@ import {
   Volume,
   Volume2,
   Pencil,
+  Radio,
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { setVideoFullscreen } from '../utils/videoFullscreen';
@@ -85,6 +86,9 @@ export const NowPlayingModal: React.FC = () => {
     setSleepTimer,
     toggleFavorite,
     playTrack,
+    radioSeed,
+    startRadio,
+    stopRadio,
     setIsNowPlayingOpen,
     nowPlayingTab,
     setNowPlayingTab,
@@ -854,6 +858,18 @@ export const NowPlayingModal: React.FC = () => {
               </div>
             </div>
 
+            {radioSeed && (
+              <div className="flex items-center justify-between gap-3 mx-1 mb-1 px-3 py-2 rounded-xl bg-white/10">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Radio className="w-4 h-4 text-accent shrink-0" />
+                  <span className="text-[13px] text-white truncate">ラジオ再生中（{radioSeed.title}から）</span>
+                </div>
+                <button onClick={stopRadio} className="shrink-0 px-3 py-1 rounded-full bg-white/15 text-[12px] font-semibold text-white active:scale-95 transition">
+                  停止
+                </button>
+              </div>
+            )}
+
             {queue.map((t, idx) => {
               const isCurrent = t.id === currentTrack.id;
               return (
@@ -1042,6 +1058,16 @@ export const NowPlayingModal: React.FC = () => {
             >
               <Sparkles className="w-4 h-4 text-accent" />
               <span>このアーティストの他の曲</span>
+            </button>
+            <button
+              onClick={() => {
+                startRadio(currentTrack);
+                setShowMoreMenu(false);
+              }}
+              className={sheetBtn}
+            >
+              <Radio className="w-4 h-4 text-accent" />
+              <span>この曲からラジオを始める</span>
             </button>
             <button
               onClick={() => {

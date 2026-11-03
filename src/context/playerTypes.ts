@@ -68,6 +68,12 @@ export interface PlayerContextType {
   addSingleTrackByUrl: (urlOrId: string, customTitle?: string, customArtist?: string) => boolean;
   /** 再生を始めずにライブラリへ追加する（既存の曲は上書きせず、新しい曲だけ先頭に足す） */
   appendTracks: (newTracks: MusicTrack[]) => void;
+  /** キューにだけ曲を足す（ライブラリには入れない）。afterCurrent=true なら現在の曲の直後に差し込む */
+  appendToQueue: (tracks: MusicTrack[], afterCurrent?: boolean) => void;
+  /** ラジオの元になった曲。ラジオ停止中は null */
+  radioSeed: MusicTrack | null;
+  startRadio: (seed: MusicTrack) => void;
+  stopRadio: () => void;
   clearAllData: () => void;
   createPlaylist: (name: string, description?: string, color?: string, initialTrackIds?: string[]) => Playlist;
   updatePlaylist: (playlistId: string, updates: Partial<Playlist>) => void;

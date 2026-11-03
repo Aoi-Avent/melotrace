@@ -225,3 +225,12 @@ export function useNewReleases(targets: NewReleaseTarget[], strictness: Strictne
 
   return { tracks, error: key ? cache.failError ?? null : null };
 }
+
+/** キャッシュ済みの新着（直近60日）を読むだけ。API は呼ばない（ラジオの選曲用） */
+export function readCachedNewReleases(): NewReleaseTrack[] {
+  const out: NewReleaseTrack[] = [];
+  for (const entry of Object.values(loadCache().byChannel)) {
+    for (const t of entry.items) if (isRecent(t.publishedAt)) out.push(t);
+  }
+  return out;
+}

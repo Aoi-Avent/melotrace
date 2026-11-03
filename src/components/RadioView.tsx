@@ -7,7 +7,7 @@ import { QuickMixItem } from '../types/music';
 import { BackgroundPlayButton } from './BackgroundGuide';
 
 export const RadioView: React.FC = () => {
-  const { activeTracks: tracks, playTrack, setIsShuffle, loadDemoData } = usePlayer();
+  const { activeTracks: tracks, playTrack, setIsShuffle, loadDemoData, currentTrack, isPlaying, radioSeed, startRadio, stopRadio } = usePlayer();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const categories = [
@@ -38,6 +38,29 @@ export const RadioView: React.FC = () => {
   return (
     <div className="ios-scroll-container pb-44 pt-2 px-5 max-w-lg mx-auto mt-stagger">
       <PageHeader title="ラジオ" subtitle="全24種類のスマートステーションから今の気分を選ぶ" />
+
+      {/* いまの曲からラジオ（再生中の曲があるときだけ） */}
+      {currentTrack && isPlaying && (
+        <div className="apple-card p-4 rounded-2xl mb-4 border border-fg/10 flex items-center gap-3">
+          <Radio className="w-5 h-5 text-accent shrink-0" />
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold text-muted uppercase tracking-wider block">いまの曲からラジオ</span>
+            <p className="text-sm font-bold text-fg truncate">{currentTrack.title}</p>
+            <p className="text-[11px] text-muted truncate">
+              {radioSeed ? `ラジオ再生中（${radioSeed.title}から）` : currentTrack.artist}
+            </p>
+          </div>
+          {radioSeed ? (
+            <button onClick={stopRadio} className="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold apple-card text-muted hover:text-fg">
+              停止
+            </button>
+          ) : (
+            <button onClick={() => startRadio(currentTrack)} className="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-fg text-inverse">
+              始める
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Category Pills (Apple Music segmented filter) */}
       <div className="flex gap-2 overflow-x-auto pb-3 pt-1 scrollbar-none mb-4 -mx-4 px-4">

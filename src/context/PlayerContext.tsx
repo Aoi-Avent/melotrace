@@ -47,6 +47,9 @@ import {
   SYNC_BASE_KEY,
 } from './playerConstants';
 import { pickPlayableIndex, nowIso, nowLabel, readBase, writeBase } from './playerUtils';
+import { buildRadioBatch } from '../utils/radio';
+import { readCachedNewReleases } from '../utils/newReleases';
+import { useCharts } from '../utils/charts';
 
 export type { PlayMetric };
 
@@ -223,6 +226,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playbackRate, setPlaybackRateState] = useState<number>(1);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('all');
   const [isShuffle, setIsShuffle] = useState<boolean>(false);
+
+  // ---- ラジオ（関連曲の自動補充）。選曲は utils/radio.ts。ここは状態と配線だけ ----
+  const [radioSeed, setRadioSeed] = useState<MusicTrack | null>(null);
+  const radioSeedRef = useRef<MusicTrack | null>(null);
+  const radioBusyRef = useRef<MusicTrack | null>(null); // 補充中の seed（同じ seed では同時に1本だけ）
+  const radioPlayedSinceRef = useRef(0); // 前回の補充から再生した曲数（シャッフル用）
+  const radioLastRefillAtRef = useRef(0);
+  const recentIdsRef = useRef<string[]>([]); // 直近に再生した曲（最大50）
+  const queueRef = useRef<MusicTrack[]>([]);
+  const queueIndexRef = useRef(0);
+  queueRef.current = queue;
+  queueIndexRef.current = queueIndex;
+  const chartsData = useCharts();
+  const radioLatestRef = useRef({ musicTracks: [] as MusicTrack[], charts: [] as MusicTrack[], bannedTracks: [] as string[], bannedArtists: [] as string[] });
+  const clearRadio = useCallback(() => {
+    radioSeedRef.current = null;
+    setRadioSeed(null);
+  }, []);
   const [sleepTimerMinutes, setSleepTimerMinutes] = useState<number | null>(null);
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(false);
   const [ytPlayerReady, setYtPlayerReady] = useState<boolean>(false);
@@ -1398,8 +1419,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => clearInterval(id);
   }, [isPlaying, pollMs, evaluateAd, applyAdState, recordMetricIfReady, logEvent, recreatePlayer]);
 
+  radioLatestRef.current = { musicTracks, charts: chartsData?.tracks ?? [], bannedTracks, bannedArtists };
+
   const playTrack = useCallback(
     (track: MusicTrack, newQueue?: MusicTrack[], shouldOpenModal: boolean = false) => {
+      // ラジオ: 別の曲・別のリストを選んだら止める（自動で次へ進む／いまのキュー内の曲を選ぶ場合は続ける）
+      if (radioSeedRef.current) {
+        const cur = queueRef.current;
+        const stays = autoAdvanceRef.current || ((!newQueue || newQueue === cur) && cur.some((t) => t.id === track.id));
+        if (!stays) clearRadio();
+      }
+      recentIdsRef.current = [track.id, ...recentIdsRef.current.filter((id) => id !== track.id)].slice(0, 50);
+      radioPlayedSinceRef.current += 1;
       const isBgm = isBgmOrClassicalTrack(track);
       const defaultQ = isBgm ? bgmTracks : musicTracks.length > 0 ? musicTracks : activeTracks;
       const q = newQueue || (queue.length > 0 ? queue : defaultQ);
@@ -1471,21 +1502,100 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         startWatchdog(track.id);
       }
 
-      setTracks((prev) =>
-        prev.map((t) => {
-          if (t.id === track.id) {
-            return {
-              ...t,
-              playCount: t.playCount + 1,
-              lastPlayed: new Date().toISOString().replace('T', ' ').slice(0, 16),
-            };
-          }
-          return t;
-        })
-      );
+      // ラジオが足した曲は、ライブラリの再生回数・最終再生を動かさない
+      if (!track.isRadio) {
+        setTracks((prev) =>
+          prev.map((t) => {
+            if (t.id === track.id) {
+              return {
+                ...t,
+                playCount: t.playCount + 1,
+                lastPlayed: new Date().toISOString().replace('T', ' ').slice(0, 16),
+              };
+            }
+            return t;
+          })
+        );
+      }
     },
-    [queue, musicTracks, bgmTracks, activeTracks, startWatchdog, logEvent, beginWaiting]
+    [queue, musicTracks, bgmTracks, activeTracks, startWatchdog, logEvent, beginWaiting, clearRadio]
   );
+
+  // キューにだけ曲を足す（ライブラリには入れない）。同じIDが「いま以前」にあれば足さず、「これから」にあれば移して足す
+  const appendToQueue = useCallback((newTracks: MusicTrack[], afterCurrent: boolean = false) => {
+    if (!newTracks || newTracks.length === 0) return;
+    const cur = queueRef.current;
+    const ci = queueIndexRef.current;
+    const past = new Set(cur.slice(0, ci + 1).map((t) => t.id));
+    const seen = new Set<string>();
+    const fresh = newTracks.filter((t) => {
+      if (past.has(t.id) || seen.has(t.id)) return false;
+      seen.add(t.id);
+      return true;
+    });
+    if (fresh.length === 0) return;
+    const head = cur.slice(0, ci + 1);
+    const tail = cur.slice(ci + 1).filter((t) => !seen.has(t.id));
+    const next = afterCurrent ? [...head, ...fresh, ...tail] : [...head, ...tail, ...fresh];
+    queueRef.current = next;
+    setQueue(next);
+  }, []);
+
+  // 関連曲を集めてキューへ足す。再生中に先読みで走らせる。失敗しても静かに諦める（再生は止めない）
+  const refillRadio = useCallback(
+    async (afterCurrent: boolean) => {
+      const seed = radioSeedRef.current;
+      if (!seed || radioBusyRef.current === seed) return;
+      radioBusyRef.current = seed;
+      radioPlayedSinceRef.current = 0;
+      radioLastRefillAtRef.current = Date.now();
+      try {
+        const q = queueRef.current;
+        const qi = queueIndexRef.current;
+        const recent = new Set<string>(recentIdsRef.current);
+        for (const t of q.slice(0, qi + 1)) recent.add(t.id); // これまでに流れた曲
+        for (const t of q.slice(qi + 1, qi + 51)) recent.add(t.id); // これから流れる50曲
+        const lt = radioLatestRef.current;
+        const bt = new Set(lt.bannedTracks);
+        const ba = new Set(lt.bannedArtists);
+        const batch = await buildRadioBatch(seed, {
+          library: lt.musicTracks,
+          charts: lt.charts,
+          newReleases: readCachedNewReleases(),
+          recentIds: recent,
+          unplayable: unplayableRef.current,
+          isBlocked: (t) => bt.has(t.id) || ba.has(t.artist),
+          prevArtist: afterCurrent ? undefined : q[q.length - 1]?.artist,
+        });
+        if (radioSeedRef.current !== seed) return; // 待っている間に止められた／別のラジオになった
+        appendToQueue(batch, afterCurrent);
+      } catch (e) {
+        // 静かに諦める
+      } finally {
+        if (radioBusyRef.current === seed) radioBusyRef.current = null;
+      }
+    },
+    [appendToQueue]
+  );
+
+  const startRadio = useCallback(
+    (seed: MusicTrack) => {
+      radioSeedRef.current = seed;
+      setRadioSeed(seed);
+      void refillRadio(true); // いまのキューは置き換えず、現在の曲の後ろに最初の10曲を足す
+    },
+    [refillRadio]
+  );
+
+  // 補充のきっかけ: 通常はキューの残りが3曲以下／シャッフル中は前回から7曲再生。曲の終了は待たない
+  useEffect(() => {
+    if (!radioSeed || !currentTrack || repeatMode === 'one') return;
+    const remaining = queue.length - 1 - queueIndex;
+    const due = isShuffle ? radioPlayedSinceRef.current >= 7 : remaining <= 3;
+    if (!due || Date.now() - radioLastRefillAtRef.current < 20000) return;
+    void refillRadio(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack?.id, radioSeed, isShuffle, repeatMode, queue.length, queueIndex]);
 
   const playBgmStation = useCallback(() => {
     if (bgmTracks.length === 0) return;
@@ -1649,6 +1759,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const loadDemoData = useCallback(() => {
+    clearRadio();
     setIsDemoMode(true);
     setTracks(DEMO_TRACKS);
     setPlaylists(DEMO_PLAYLISTS);
@@ -1670,6 +1781,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const importTracks = useCallback((newTracks: MusicTrack[]) => {
     if (!newTracks || newTracks.length === 0) return;
 
+    clearRadio();
     setIsDemoMode(false);
     setTracks(newTracks);
     setQueue(newTracks);
@@ -1760,6 +1872,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const clearAllData = useCallback(() => {
+    clearRadio();
     wantPlayingRef.current = false;
     if (ytPlayerRef.current?.pauseVideo) {
       ytPlayerRef.current.pauseVideo();
@@ -2186,6 +2299,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         importTracks,
         addSingleTrackByUrl,
         appendTracks,
+        appendToQueue,
+        radioSeed,
+        startRadio,
+        stopRadio: clearRadio,
         clearAllData,
         createPlaylist,
         updatePlaylist,
