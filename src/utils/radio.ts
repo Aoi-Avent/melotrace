@@ -6,7 +6,7 @@
 //   どちらも youtubeApi 側のキャッシュ（6h / 12h）が効くので、同じチャンネルの2回目以降は0ユニット。
 //   チャンネル未解決・キー無し・エラー時は何も呼ばず（または諦めて）、ライブラリ内の同じアーティストで代替する。
 import type { MusicTrack } from '../types/music';
-import { classifyMusicGenre, extractSmartTrackMeta } from './parser';
+import { classifyMusicGenre, extractSmartTrackMeta, isLikelyMusic } from './parser';
 import { normalizeName } from './textMatch';
 import { getPlaylistVideos, getVideos } from './youtubeApi';
 import { uploadsPlaylistIdOf } from './youtubeUrl';
@@ -26,6 +26,8 @@ export interface RadioContext {
   isBlocked?: (t: MusicTrack) => boolean;
   /** この補充の直前に流れる曲のアーティスト（同じ人が連続しないように並べるため） */
   prevArtist?: string;
+  /** 音楽判定の厳しさ（設定の strictnessMode）。未指定は 'standard' */
+  strictness?: 'strict' | 'standard' | 'all';
 }
 
 export const RADIO_BATCH_SIZE = 10;
@@ -70,7 +72,7 @@ function resolveChannelId(seed: MusicTrack, ctx: RadioContext): string | null {
 }
 
 /** 同じチャンネルの最近のアップロード（最大10件）。失敗したら空配列（静かに諦める） */
-async function fetchUploads(channelId: string): Promise<MusicTrack[]> {
+async function fetchUploads(channelId: string, strictness: 'strict' | 'standard' | 'all'): Promise<MusicTrack[]> {
   try {
     const vids = await getPlaylistVideos(uploadsPlaylistIdOf(channelId), { maxItems: 10 });
     if (vids.length === 0) return [];
@@ -78,6 +80,8 @@ async function fetchUploads(channelId: string): Promise<MusicTrack[]> {
     const out: MusicTrack[] = [];
     for (const v of details) {
       if (!v.embeddable || v.durationSec < MIN_SEC || v.durationSec > MAX_SEC) continue;
+      // 他の経路（新着・取り込み）と同じ音楽判定。API呼び出しは増えない（0ユニット）
+      if (!isLikelyMusic(v.title, v.channelTitle, undefined, strictness)) continue;
       const meta = extractSmartTrackMeta(v.title, v.channelTitle);
       out.push({
         id: v.id,
@@ -129,7 +133,7 @@ export async function buildRadioBatch(seed: MusicTrack, ctx: RadioContext): Prom
 
   // 1) 同じアーティスト（uploads → ライブラリ内の同じアーティスト）
   const channelId = resolveChannelId(seed, ctx);
-  const uploads = channelId ? (await fetchUploads(channelId)).filter(ok) : [];
+  const uploads = channelId ? (await fetchUploads(channelId, ctx.strictness ?? 'standard')).filter(ok) : [];
   const sameArtistLib = seedKey ? lib.filter((t) => keyOf(t) === seedKey) : [];
   const s1 = shuffle([...uploads, ...sameArtistLib]);
 
