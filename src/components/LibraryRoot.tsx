@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRight, ListMusic, Mic2, Music, Disc3, Headphones, Star, Heart } from 'lucide-react';
+import { ChevronRight, ListMusic, Mic2, Music, Disc3, Headphones, Star, Heart, History } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { PageHeader } from './PageHeader';
 import { navLib, LibRoute } from '../utils/nav';
@@ -26,6 +26,7 @@ export const LibraryRoot: React.FC = () => {
     { route: 'all', label: '曲', icon: <Music className="w-[22px] h-[22px]" />, count: musicTracks.length },
     { route: 'vocaloid', label: 'ボカロ・歌ってみた', icon: <Disc3 className="w-[22px] h-[22px]" />, count: counts.voca },
     { route: 'bgm', label: 'BGM', icon: <Headphones className="w-[22px] h-[22px]" />, count: bgmTracks.length },
+    { route: 'history', label: '再生履歴', icon: <History className="w-[22px] h-[22px]" />, count: 0 },
     { route: 'favorites', label: 'お気に入りの曲', icon: <Heart className="w-[22px] h-[22px]" />, count: counts.fav },
     { route: 'favArtists', label: 'お気に入りのアーティスト', icon: <Star className="w-[22px] h-[22px]" />, count: favoriteArtists.length },
   ];

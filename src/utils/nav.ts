@@ -5,7 +5,7 @@
 import { useSyncExternalStore } from 'react';
 import type { ActiveTab } from '../types/music';
 
-export type LibRoute = 'root' | 'all' | 'vocaloid' | 'bgm' | 'favorites' | 'playlists' | 'artists' | 'favArtists';
+export type LibRoute = 'root' | 'all' | 'vocaloid' | 'bgm' | 'favorites' | 'playlists' | 'artists' | 'favArtists' | 'history';
 
 interface NavState {
   tab: ActiveTab;

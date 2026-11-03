@@ -16,6 +16,7 @@ import { DataImportView } from './components/DataImportView';
 import { ArtistsView } from './components/ArtistsView';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { LibraryRoot } from './components/LibraryRoot';
+import { PlayHistoryView } from './components/PlayHistoryView';
 import { useNav, navSetTab, navBack, installChromeScroll } from './utils/nav';
 import { RetroPlayer } from './components/RetroPlayer';
 import { BackgroundGuideModal } from './components/BackgroundGuide';
@@ -216,6 +217,7 @@ const AppContent: React.FC = () => {
         )}
         {activeTab === 'library' && nav.lib === 'artists' && <ViewErrorBoundary label="アーティスト"><ArtistsView /></ViewErrorBoundary>}
         {activeTab === 'library' && nav.lib === 'favArtists' && <ViewErrorBoundary label="お気に入りのアーティスト"><ArtistsView favoritesOnly /></ViewErrorBoundary>}
+        {activeTab === 'library' && nav.lib === 'history' && <ViewErrorBoundary label="再生履歴"><PlayHistoryView /></ViewErrorBoundary>}
         {activeTab === 'search' && (
           <SearchView onSelectArtist={(artist) => setSelectedArtistForDetail(artist)} />
         )}

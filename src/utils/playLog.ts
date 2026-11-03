@@ -110,6 +110,47 @@ export async function readPlayLog(limit?: number): Promise<PlayLogRow[]> {
   }
 }
 
+/** ログの最古の ts（0件なら null）。IndexedDB のみ・YouTube API 消費 0。 */
+export async function readOldestPlayTs(): Promise<number | null> {
+  try {
+    const db = await openDB();
+    const req = db.transaction(STORE_PLAY_LOG, 'readonly').objectStore(STORE_PLAY_LOG).index('ts').openCursor(null, 'next');
+    return await new Promise<number | null>((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result ? (req.result.value as PlayLogRow).ts : null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn('readOldestPlayTs failed:', err);
+    return null;
+  }
+}
+
+/**
+ * 新しい順に limit 件だけ読む。beforeTs を渡すと、それより古い行から（beforeTs 未満）。
+ * 続きを読むときは、直前に読んだ最後の行の ts を渡す。IndexedDB のみ・YouTube API 消費 0。
+ */
+export async function readPlayLogPage(limit: number, beforeTs?: number | null): Promise<PlayLogRow[]> {
+  try {
+    const db = await openDB();
+    const index = db.transaction(STORE_PLAY_LOG, 'readonly').objectStore(STORE_PLAY_LOG).index('ts');
+    const range = beforeTs != null ? IDBKeyRange.upperBound(beforeTs, true) : null;
+    const out: PlayLogRow[] = [];
+    return await new Promise<PlayLogRow[]>((resolve, reject) => {
+      const req = index.openCursor(range, 'prev');
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur || out.length >= limit) return resolve(out);
+        out.push(cur.value as PlayLogRow);
+        cur.continue();
+      };
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn('readPlayLogPage failed:', err);
+    return [];
+  }
+}
+
 /** 1本のトランザクションで、条件に合う行を古い順に最大 max 件消す（max 省略で全部） */
 async function deleteOldest(range: IDBKeyRange | null, max?: number): Promise<void> {
   const db = await openDB();
