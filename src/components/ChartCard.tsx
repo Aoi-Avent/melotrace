@@ -9,11 +9,13 @@ interface ChartCardProps {
   queue: MusicTrack[];
   /** 左上に出す順位（省略可） */
   rank?: number;
+  /** アーティスト名の下に小さく出す補足（「3日前」など。省略可） */
+  subtitle?: string;
   inLibrary: boolean;
 }
 
 /** チャート系の棚で使う、サムネイル・再生・「ライブラリに追加」のカード */
-export const ChartCard: React.FC<ChartCardProps> = ({ track, queue, rank, inLibrary }) => {
+export const ChartCard: React.FC<ChartCardProps> = ({ track, queue, rank, subtitle, inLibrary }) => {
   const { currentTrack, isPlaying, playTrack, appendTracks } = usePlayer();
   const added = inLibrary;
 
@@ -48,6 +50,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({ track, queue, rank, inLibr
         </div>
         <h4 className="text-xs font-semibold text-fg truncate leading-tight">{track.title}</h4>
         <p className="text-[11px] text-muted truncate mt-0.5">{track.artist}</p>
+        {subtitle && <p className="text-[10px] text-muted/80 truncate">{subtitle}</p>}
       </div>
 
       <button

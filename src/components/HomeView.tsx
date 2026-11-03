@@ -19,6 +19,7 @@ import { QUICK_MIXES } from '../data/quickMixes';
 import { BackgroundPlayButton } from './BackgroundGuide';
 import { ChartsShelf } from './ChartsShelf';
 import { RecommendedShelf } from './RecommendedShelf';
+import { NewReleasesShelf } from './NewReleasesShelf';
 import { useCharts, pickByArtists } from '../utils/charts';
 
 interface HomeViewProps {
@@ -206,6 +207,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab }) => {
 
       {/* 人気の音楽（日本）: charts.json が無ければ非表示 */}
       <RecommendedShelf tracks={recommended} ranks={chartRanks} />
+      <NewReleasesShelf />
       <ChartsShelf charts={charts} excludeIds={recommendedIds} />
 
       {/* QUICK MIXES (Expanded to 24 with pull-down toggle) */}
