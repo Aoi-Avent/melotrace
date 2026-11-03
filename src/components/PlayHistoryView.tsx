@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader } from './PageHeader';
 import { usePlayer } from '../context/PlayerContext';
 import { MusicTrack } from '../types/music';
+import { loadPreLogSnapshot, parseLastPlayedUtc } from '../utils/preLogSnapshot';
 import { PlayLogRow, localDateString, readOldestPlayTs, readPlayLogPage } from '../utils/playLog';
 
 /**
@@ -32,13 +33,6 @@ function groupLabel(date: string, today: string, yesterday: string): string {
   const [y, m, d] = date.split('-').map(Number);
   const wd = WEEK[new Date(y, m - 1, d).getDay()];
   return `${y === Number(today.slice(0, 4)) ? '' : `${y}年`}${m}月${d}日(${wd})`;
-}
-
-/** lastPlayed 'YYYY-MM-DD HH:mm'（UTC）→ エポックms。壊れた値は null */
-function parseLastPlayedUtc(s: string | undefined): number | null {
-  if (!s) return null;
-  const t = Date.parse(s.trim().replace(' ', 'T') + (s.trim().length <= 10 ? 'T00:00:00Z' : ':00Z'));
-  return Number.isNaN(t) ? null : t;
 }
 
 export const PlayHistoryView: React.FC = () => {
@@ -96,11 +90,13 @@ export const PlayHistoryView: React.FC = () => {
     }
     // ログ前の分は、ログを読み切ってから（途中で混ざらないように）
     if (logDone && oldestTs !== undefined) {
+      // 控え（上書き前の日付）を優先。控えが無い曲は、現在の lastPlayed がログより前なら使う
+      const snap = loadPreLogSnapshot();
       const pre: { track: MusicTrack; ts: number }[] = [];
       for (const t of activeTracks) {
-        const ts = parseLastPlayedUtc(t.lastPlayed); // UTC として解釈
+        const ts = snap[t.id] ?? parseLastPlayedUtc(t.lastPlayed); // lastPlayed は UTC として解釈
         if (ts == null) continue;
-        if (oldestTs == null || ts < oldestTs) pre.push({ track: t, ts });
+        if (snap[t.id] != null || oldestTs == null || ts < oldestTs) pre.push({ track: t, ts });
       }
       pre.sort((a, b) => b.ts - a.ts);
       for (const p of pre) {

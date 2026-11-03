@@ -17,6 +17,7 @@ import { ArtistsView } from './components/ArtistsView';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { LibraryRoot } from './components/LibraryRoot';
 import { PlayHistoryView } from './components/PlayHistoryView';
+import { usePreLogSnapshot } from './utils/preLogSnapshot';
 import { useNav, navSetTab, navBack, installChromeScroll } from './utils/nav';
 import { RetroPlayer } from './components/RetroPlayer';
 import { BackgroundGuideModal } from './components/BackgroundGuide';
@@ -106,6 +107,7 @@ const AppContent: React.FC = () => {
     selectedArtistForDetail,
     setSelectedArtistForDetail,
   } = usePlayer();
+  usePreLogSnapshot(); // ログ開始前の再生日を、上書きされる前に控える
 
   // 下のバーを、スクロールに合わせてたたむ・広げる
   useEffect(() => {
