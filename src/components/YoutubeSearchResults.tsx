@@ -41,7 +41,8 @@ const nowStr = () => new Date().toISOString().replace('T', ' ').slice(0, 16);
 export const YoutubeSearchResults: React.FC<Props> = ({ query, centered }) => {
   const { tracks: library, favoriteArtists, playTrack, appendTracks, addFavoriteArtists } = usePlayer();
   const source = useYoutubeApiKeySource();
-  const usage = useYoutubeUsage();
+  // 「あと約N回」は自分のキー（'user'）の分だけ。共有キーで使った分は混ぜない
+  const usage = useYoutubeUsage('user');
   const [found, setFound] = useState<Found | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

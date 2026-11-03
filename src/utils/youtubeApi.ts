@@ -221,6 +221,7 @@ async function pruneOnce(): Promise<void> {
       c.continue();
     };
     const oldest = quotaDay(now - USAGE_KEEP_DAYS * 24 * HOUR);
+    // キーは旧形式 'YYYY-MM-DD' も新形式 'YYYY-MM-DD:kind' も文字列の辞書順で日付順に並ぶので、同じ範囲削除で両方消える
     tx.objectStore(STORE_YT_USAGE).delete(IDBKeyRange.upperBound(oldest, true));
     await txDone(tx);
   } catch (err) {
@@ -281,9 +282,15 @@ async function cached<T>(key: string, ttlMs: number, force: boolean | undefined,
 /* 使用量（日ごとの概算ユニット）                                          */
 /* ------------------------------------------------------------------ */
 
+/** 使うキーの種類。'user' = 利用者自身のキー（BYOK）、'build' = ビルド時の共有キー。使用量はこの単位で別々に数える */
+export type YtKeyKind = 'user' | 'build';
+const KEY_KINDS: readonly YtKeyKind[] = ['user', 'build'];
+
 export interface YtUsageDay {
   /** クォータの日付（太平洋時間, YYYY-MM-DD） */
   date: string;
+  /** どのキーの分か */
+  kind: YtKeyKind;
   units: number;
   calls: number;
   /** Google から「上限到達」と返された日は true */
@@ -295,6 +302,21 @@ export interface YtUsageSnapshot extends YtUsageDay {
   /** 直近の API エラー（このセッション内）。画面にそのまま出せる文言 */
   lastError: string;
 }
+
+/**
+ * IndexedDB に入る行。ストアの keyPath は従来どおり 'date'（DBバージョンは上げない）。
+ * 新形式: date = `${day}:${kind}`（day, kind も持つ）。旧形式: date = 日付だけ・kind なし → 読むときに 'build' として扱う。
+ */
+interface YtUsageRow {
+  date: string;
+  day?: string;
+  kind?: YtKeyKind;
+  units: number;
+  calls: number;
+  exhausted: boolean;
+}
+
+const usageRowKey = (day: string, kind: YtKeyKind): string => `${day}:${kind}`;
 
 const dayFmt = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Los_Angeles',
@@ -308,52 +330,87 @@ function quotaDay(now: number = Date.now()): string {
   return dayFmt.format(now);
 }
 
-let snapshot: YtUsageSnapshot = { date: quotaDay(), units: 0, calls: 0, exhausted: false, limit: YT_DAILY_QUOTA, lastError: '' };
-let usageLoaded: Promise<void> | null = null;
+function emptySnapshot(kind: YtKeyKind): YtUsageSnapshot {
+  return { date: quotaDay(), kind, units: 0, calls: 0, exhausted: false, limit: YT_DAILY_QUOTA, lastError: '' };
+}
+
+let snapshots: Record<YtKeyKind, YtUsageSnapshot> = { user: emptySnapshot('user'), build: emptySnapshot('build') };
+const usageLoaded: Record<YtKeyKind, Promise<void> | null> = { user: null, build: null };
 const usageListeners = new Set<() => void>();
 
-function emitUsage(patch: Partial<YtUsageSnapshot>): void {
-  snapshot = { ...snapshot, ...patch };
+/** いま使われる（保存済みの）キーの種類。キーの値は見ない */
+function activeKind(): YtKeyKind {
+  return getYoutubeApiKeySource() === 'user' ? 'user' : 'build';
+}
+
+function emitUsage(kind: YtKeyKind, patch: Partial<YtUsageSnapshot>): void {
+  snapshots = { ...snapshots, [kind]: { ...snapshots[kind], ...patch } };
   usageListeners.forEach((l) => l());
 }
 
-async function persistUsage(): Promise<void> {
+async function persistUsage(kind: YtKeyKind): Promise<void> {
   try {
     const db = await getDB();
-    const { date, units, calls, exhausted } = snapshot;
+    const { date: day, units, calls, exhausted } = snapshots[kind];
     const tx = db.transaction(STORE_YT_USAGE, 'readwrite');
-    tx.objectStore(STORE_YT_USAGE).put({ date, units, calls, exhausted } as YtUsageDay);
+    tx.objectStore(STORE_YT_USAGE).put({ date: usageRowKey(day, kind), day, kind, units, calls, exhausted } as YtUsageRow);
     await txDone(tx);
   } catch (err) {
     console.warn('youtubeApi: usage write failed', err);
   }
 }
 
-/** 今日の使用量をDBから読み込む（日付が変わっていれば0から数え直す）。何度呼んでも安全 */
-export function loadYoutubeUsage(): Promise<void> {
+/** 今日の使用量を、種類ごとにDBから読み込む（日付が変わっていれば0から数え直す）。何度呼んでも安全 */
+function loadKind(kind: YtKeyKind): Promise<void> {
   const today = quotaDay();
-  if (usageLoaded && snapshot.date === today) return usageLoaded;
-  usageLoaded = (async () => {
-    let row: YtUsageDay | undefined;
+  const cur = usageLoaded[kind];
+  if (cur && snapshots[kind].date === today) return cur;
+  const p = (async () => {
+    let row: YtUsageRow | undefined;
     try {
       const db = await getDB();
-      row = (await reqDone(db.transaction(STORE_YT_USAGE, 'readonly').objectStore(STORE_YT_USAGE).get(today))) as
-        | YtUsageDay
-        | undefined;
+      const store = db.transaction(STORE_YT_USAGE, 'readonly').objectStore(STORE_YT_USAGE);
+      // 旧形式（日付だけのキー）は 'build' の分として読む。2つの get は await の前に両方発行する
+      const reqNew = reqDone(store.get(usageRowKey(today, kind))) as Promise<YtUsageRow | undefined>;
+      const reqOld = kind === 'build' ? (reqDone(store.get(today)) as Promise<YtUsageRow | undefined>) : Promise.resolve(undefined);
+      const [rowNew, rowOld] = await Promise.all([reqNew, reqOld]);
+      row = rowNew ?? rowOld;
     } catch (err) {
       console.warn('youtubeApi: usage read failed', err);
     }
-    emitUsage({ date: today, units: row?.units ?? 0, calls: row?.calls ?? 0, exhausted: row?.exhausted ?? false });
+    emitUsage(kind, { date: today, units: row?.units ?? 0, calls: row?.calls ?? 0, exhausted: row?.exhausted ?? false });
   })();
-  return usageLoaded;
+  usageLoaded[kind] = p;
+  return p;
 }
 
-/** 直近 days 日分の使用量（新しい順） */
+/** 今日の使用量をDBから読み込む。kind を省略すると両方 */
+export function loadYoutubeUsage(kind?: YtKeyKind): Promise<void> {
+  if (kind) return loadKind(kind);
+  return Promise.all(KEY_KINDS.map(loadKind)).then(() => undefined);
+}
+
+/** 直近 days 日分の使用量（新しい順。同じ日は 'user' → 'build' の順）。旧形式の行は 'build' として返す */
 export async function getYoutubeUsageHistory(days = 14): Promise<YtUsageDay[]> {
   try {
     const db = await getDB();
-    const rows = (await reqDone(db.transaction(STORE_YT_USAGE, 'readonly').objectStore(STORE_YT_USAGE).getAll())) as YtUsageDay[];
-    return rows.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, days);
+    const rows = (await reqDone(db.transaction(STORE_YT_USAGE, 'readonly').objectStore(STORE_YT_USAGE).getAll())) as YtUsageRow[];
+    const out: YtUsageDay[] = [];
+    const hasNewBuild = new Set<string>();
+    for (const r of rows) {
+      if (r.kind) {
+        const day = r.day ?? r.date.split(':')[0];
+        if (r.kind === 'build') hasNewBuild.add(day);
+        out.push({ date: day, kind: r.kind, units: r.units, calls: r.calls, exhausted: r.exhausted });
+      }
+    }
+    for (const r of rows) {
+      if (!r.kind && !hasNewBuild.has(r.date)) {
+        out.push({ date: r.date, kind: 'build', units: r.units, calls: r.calls, exhausted: r.exhausted });
+      }
+    }
+    out.sort((x, y) => (x.date !== y.date ? (x.date < y.date ? 1 : -1) : x.kind === y.kind ? 0 : x.kind === 'user' ? -1 : 1));
+    return out.slice(0, days);
   } catch (err) {
     console.warn('youtubeApi: usage history failed', err);
     return [];
@@ -365,17 +422,22 @@ function subscribeUsage(cb: () => void): () => void {
   return () => usageListeners.delete(cb);
 }
 
-/** 設定画面の「今日の使用量」表示用 */
-export function useYoutubeUsage(): YtUsageSnapshot {
-  return useSyncExternalStore(subscribeUsage, () => snapshot, () => snapshot);
+/**
+ * 使用量の表示用。kind を省略すると「いま使われるキー」の分（キーの保存・削除で再描画される）。
+ * 「あと約N回」のように自分のキー分だけが必要なときは 'user' を渡す。
+ */
+export function useYoutubeUsage(kind?: YtKeyKind): YtUsageSnapshot {
+  usePref(USER_KEY_PREF, ''); // 引数なしのとき、キーの保存・削除に追従するため
+  const k = kind ?? activeKind();
+  return useSyncExternalStore(subscribeUsage, () => snapshots[k], () => snapshots[k]);
 }
 
 /* ------------------------------------------------------------------ */
 /* エラー                                                              */
 /* ------------------------------------------------------------------ */
 
-function reportError(err: YoutubeApiError): YoutubeApiError {
-  emitUsage({ lastError: err.message });
+function reportError(err: YoutubeApiError, kind: YtKeyKind = activeKind()): YoutubeApiError {
+  emitUsage(kind, { lastError: err.message });
   return err;
 }
 
@@ -429,18 +491,20 @@ async function toApiError(res: Response): Promise<YoutubeApiError> {
 type Params = Record<string, string | number | undefined>;
 
 async function callApi(endpoint: Endpoint, params: Params, keyOverride?: string): Promise<any> {
-  await loadYoutubeUsage();
-
   if (endpoint === 'search') requireUserKey(); // 共有キー・キー無しでは、絶対に search を叩かない
   const cost = ENDPOINT_COST[endpoint];
   const key = keyOverride || resolveApiKey();
+  // このリクエストが使うキーの種類。上限チェックも exhausted も、この種類のカウンタだけを見る（キーの値は見ない）
+  const kind: YtKeyKind = (keyOverride || getYoutubeApiKeySource() === 'user') ? 'user' : 'build';
+  await loadKind(kind);
   if (!key) {
     throw reportError(
       new YoutubeApiError('NO_KEY', 'YouTube APIキーが設定されていません。設定でキーを入力するか、ビルド時に VITE_YOUTUBE_API_KEY を設定してください。'),
+      kind,
     );
   }
-  if (snapshot.exhausted || snapshot.units + cost > YT_DAILY_QUOTA) {
-    throw reportError(new YoutubeApiError('QUOTA_EXCEEDED', quotaMessage()));
+  if (snapshots[kind].exhausted || snapshots[kind].units + cost > YT_DAILY_QUOTA) {
+    throw reportError(new YoutubeApiError('QUOTA_EXCEEDED', quotaMessage()), kind);
   }
 
   const qs = new URLSearchParams();
@@ -455,22 +519,22 @@ async function callApi(endpoint: Endpoint, params: Params, keyOverride?: string)
   try {
     res = await fetch(`${API_BASE}/${endpoint}?${qs.toString()}`, { signal: ctrl.signal });
   } catch {
-    throw reportError(new YoutubeApiError('NETWORK', 'YouTube APIに接続できませんでした。通信状況を確認してください。'));
+    throw reportError(new YoutubeApiError('NETWORK', 'YouTube APIに接続できませんでした。通信状況を確認してください。'), kind);
   } finally {
     clearTimeout(timer);
   }
 
   // 応答が返った時点で1リクエスト分としてカウント（失敗応答も Google 側では消費されうる）
-  emitUsage({ units: snapshot.units + cost, calls: snapshot.calls + 1 });
+  emitUsage(kind, { units: snapshots[kind].units + cost, calls: snapshots[kind].calls + 1 });
 
   if (!res.ok) {
     const err = await toApiError(res);
-    if (err.code === 'QUOTA_EXCEEDED') emitUsage({ exhausted: true });
-    void persistUsage();
-    throw reportError(err);
+    if (err.code === 'QUOTA_EXCEEDED') emitUsage(kind, { exhausted: true });
+    void persistUsage(kind);
+    throw reportError(err, kind);
   }
-  void persistUsage();
-  emitUsage({ lastError: '' });
+  void persistUsage(kind);
+  emitUsage(kind, { lastError: '' });
   return res.json();
 }
 
@@ -745,11 +809,11 @@ export function normalizeSearchQuery(q: string): string {
   return q.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-/** 今日の残りで、このコストを払えるか。払えなければ API を叩かずに QUOTA_EXCEEDED を投げる */
-async function assertQuotaFor(cost: number): Promise<void> {
-  await loadYoutubeUsage();
-  if (snapshot.exhausted || snapshot.units + cost > YT_DAILY_QUOTA) {
-    throw reportError(new YoutubeApiError('QUOTA_EXCEEDED', quotaMessage()));
+/** 今日の残りで、このコストを払えるか（検索は 'user' のキーだけなので、'user' のカウンタを見る）。払えなければ API を叩かずに QUOTA_EXCEEDED を投げる */
+async function assertQuotaFor(cost: number, kind: YtKeyKind = 'user'): Promise<void> {
+  await loadKind(kind);
+  if (snapshots[kind].exhausted || snapshots[kind].units + cost > YT_DAILY_QUOTA) {
+    throw reportError(new YoutubeApiError('QUOTA_EXCEEDED', quotaMessage()), kind);
   }
 }
 
