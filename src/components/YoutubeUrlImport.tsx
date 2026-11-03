@@ -2,7 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Link2, Loader2, Square, CheckCircle2, AlertCircle } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { MusicTrack } from '../types/music';
-import { isLikelyMusic, extractSmartTrackMeta, classifyMusicGenre } from '../utils/parser';
+import { isLikelyMusic } from '../utils/parser';
+import { buildImportedTrack } from '../utils/videoToTrack';
 import { YoutubeApiError, YtPlaylistVideo, findChannel, getPlaylistPage } from '../utils/youtubeApi';
 import {
   UrlImportError,
@@ -18,20 +19,7 @@ const MAX_PAGES = 40;
 const nowStr = () => new Date().toISOString().replace('T', ' ').slice(0, 16);
 
 function toTrack(v: YtPlaylistVideo): MusicTrack {
-  const meta = extractSmartTrackMeta(v.title, v.channelTitle);
-  const now = nowStr();
-  return {
-    id: v.videoId,
-    title: meta.cleanTitle,
-    artist: meta.cleanArtist,
-    channelId: v.channelId || undefined,
-    genre: classifyMusicGenre(v.title, v.channelTitle),
-    playCount: 1,
-    lastPlayed: now,
-    firstPlayed: now,
-    isFavorite: false,
-    thumbnailUrl: `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
-  };
+  return buildImportedTrack({ id: v.videoId, title: v.title, channelTitle: v.channelTitle, channelId: v.channelId }, nowStr());
 }
 
 interface Progress {

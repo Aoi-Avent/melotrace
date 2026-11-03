@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { resolveChannelInput, type ArtistChannel } from '../utils/artistChannels';
+import { ArtistChannelSearch } from './ArtistChannelSearch';
 
 interface ArtistChannelSheetProps {
   unresolved: string[];
@@ -71,6 +72,7 @@ export const ArtistChannelSheet: React.FC<ArtistChannelSheetProps> = ({ unresolv
                 </button>
               </div>
               {errors[name] && <p className="text-[11px] text-red-400 mt-1">{errors[name]}</p>}
+              <ArtistChannelSearch name={name} onPick={(ch) => onLink(name, ch)} />
             </div>
           ))}
         </div>

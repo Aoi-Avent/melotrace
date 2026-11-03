@@ -7,8 +7,9 @@
  *   const chans  = await getChannels(['UCxxxx']);
  *   const hits   = await getPopularMusicVideos();            // 既定: JP
  *
- * - 使うのは playlistItems.list / videos.list / channels.list のみ（search.list は使わない）。
- *   どれも 1ユニット/回。1日の上限は 10,000 ユニット（太平洋時間の0時にリセット）。
+ * - 使うのは playlistItems.list / videos.list / channels.list（各1ユニット/回）と、
+ *   search.list（100ユニット/回）。search.list は利用者自身のAPIキーのときだけ、利用者のタップで呼ぶ。
+ *   1日の上限は 10,000 ユニット（太平洋時間の0時にリセット）。
  * - APIキー: 設定で入力した任意キー（setYoutubeApiKey）→ なければビルド時の VITE_YOUTUBE_API_KEY。
  * - 結果は IndexedDB（db.ts と同じDB）にキャッシュ。有効期間内は API を呼ばない。
  * - 実際に送ったリクエストだけを、日ごとに概算ユニットとして記録する。
@@ -16,7 +17,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import { openDB, STORE_YT_CACHE, STORE_YT_USAGE } from './db';
-import { getPref, setPref } from './uiPrefs';
+import { getPref, setPref, usePref } from './uiPrefs';
 
 /* ------------------------------------------------------------------ */
 /* 型                                                                  */
@@ -68,6 +69,7 @@ export type YtErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'RATE_LIMITED'
   | 'NOT_FOUND'
+  | 'USER_KEY_REQUIRED'
   | 'NETWORK'
   | 'HTTP';
 
@@ -97,8 +99,9 @@ export interface YtCallOptions {
 
 const API_BASE = 'https://www.googleapis.com/youtube/v3';
 export const YT_DAILY_QUOTA = 10000;
-/** playlistItems / videos / channels の list は、1回あたり1ユニット */
-const COST_PER_LIST_CALL = 1;
+/** エンドポイントごとの1回あたりのコスト（ユニット）。search だけ100 */
+const ENDPOINT_COST = { playlistItems: 1, videos: 1, channels: 1, search: 100 } as const;
+type Endpoint = keyof typeof ENDPOINT_COST;
 const MAX_IDS_PER_CALL = 50;
 const REQUEST_TIMEOUT_MS = 15000;
 const MUSIC_CATEGORY_ID = '10';
@@ -109,6 +112,7 @@ const TTL = {
   video: 12 * HOUR,
   channel: 24 * HOUR,
   popular: 3 * HOUR,
+  search: 24 * HOUR,
 } as const;
 
 const USER_KEY_PREF = 'melotrace_yt_api_key_v1';
@@ -129,6 +133,20 @@ export function getYoutubeApiKeySource(): 'user' | 'build' | 'none' {
   return 'none';
 }
 
+/** キーの種類を画面で使うためのフック（キーが保存・削除されると再描画される。キーの値は返さない） */
+export function useYoutubeApiKeySource(): 'user' | 'build' | 'none' {
+  usePref(USER_KEY_PREF, '');
+  return getYoutubeApiKeySource();
+}
+
+/** search.list は利用者自身のキーでだけ使う。それ以外では、APIを叩かずにこのエラーを投げる */
+function requireUserKey(): void {
+  if (getYoutubeApiKeySource() !== 'user') {
+    throw reportError(
+      new YoutubeApiError('USER_KEY_REQUIRED', 'YouTube全体の検索には、あなた自身のAPIキーが必要です。取込タブの「YouTube APIキー」で設定してください。'),
+    );
+  }
+}
 function buildTimeKey(): string {
   const v = import.meta.env.VITE_YOUTUBE_API_KEY as string | undefined;
   return (v || '').trim();
@@ -410,16 +428,18 @@ async function toApiError(res: Response): Promise<YoutubeApiError> {
 
 type Params = Record<string, string | number | undefined>;
 
-async function callApi(endpoint: 'playlistItems' | 'videos' | 'channels', params: Params): Promise<any> {
+async function callApi(endpoint: Endpoint, params: Params, keyOverride?: string): Promise<any> {
   await loadYoutubeUsage();
 
-  const key = resolveApiKey();
+  if (endpoint === 'search') requireUserKey(); // 共有キー・キー無しでは、絶対に search を叩かない
+  const cost = ENDPOINT_COST[endpoint];
+  const key = keyOverride || resolveApiKey();
   if (!key) {
     throw reportError(
       new YoutubeApiError('NO_KEY', 'YouTube APIキーが設定されていません。設定でキーを入力するか、ビルド時に VITE_YOUTUBE_API_KEY を設定してください。'),
     );
   }
-  if (snapshot.exhausted || snapshot.units + COST_PER_LIST_CALL > YT_DAILY_QUOTA) {
+  if (snapshot.exhausted || snapshot.units + cost > YT_DAILY_QUOTA) {
     throw reportError(new YoutubeApiError('QUOTA_EXCEEDED', quotaMessage()));
   }
 
@@ -441,7 +461,7 @@ async function callApi(endpoint: 'playlistItems' | 'videos' | 'channels', params
   }
 
   // 応答が返った時点で1リクエスト分としてカウント（失敗応答も Google 側では消費されうる）
-  emitUsage({ units: snapshot.units + COST_PER_LIST_CALL, calls: snapshot.calls + 1 });
+  emitUsage({ units: snapshot.units + cost, calls: snapshot.calls + 1 });
 
   if (!res.ok) {
     const err = await toApiError(res);
@@ -695,4 +715,114 @@ export async function findChannel(by: { handle: string } | { username: string })
   const data = await callApi('channels', params);
   const it = (data.items || [])[0];
   return it ? mapChannel(it) : null;
+}
+
+/* ------------------------------------------------------------------ */
+/* 検索（search.list）。利用者自身のキーのときだけ、利用者のタップで呼ぶ        */
+/* ------------------------------------------------------------------ */
+
+export interface YtSearchPage {
+  /** 60秒〜20分・埋め込み可のものだけ */
+  videos: YtVideo[];
+  /** 次のページが無ければ空文字 */
+  nextPageToken: string;
+}
+
+export interface YtChannelHit {
+  id: string;
+  title: string;
+  thumbnail: string;
+}
+
+/** 検索1回の目安（search.list 100 + videos.list 1） */
+export const SEARCH_UNITS_PER_PAGE = ENDPOINT_COST.search + ENDPOINT_COST.videos;
+
+const SEARCH_MIN_SEC = 60;
+const SEARCH_MAX_SEC = 20 * 60;
+
+/** 小文字化・空白の正規化（キャッシュのキーにも使う） */
+export function normalizeSearchQuery(q: string): string {
+  return q.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** 今日の残りで、このコストを払えるか。払えなければ API を叩かずに QUOTA_EXCEEDED を投げる */
+async function assertQuotaFor(cost: number): Promise<void> {
+  await loadYoutubeUsage();
+  if (snapshot.exhausted || snapshot.units + cost > YT_DAILY_QUOTA) {
+    throw reportError(new YoutubeApiError('QUOTA_EXCEEDED', quotaMessage()));
+  }
+}
+
+/**
+ * YouTube全体から音楽動画を探す。
+ * API消費の見積もり: search.list 100 + videos.list 1 = 約101ユニット（キャッシュ有効の24時間は 0ユニット）。
+ * 次ページ（pageToken）も、それぞれ約101ユニット。
+ */
+export async function searchMusicVideos(query: string, opts: { pageToken?: string; force?: boolean } = {}): Promise<YtSearchPage> {
+  requireUserKey();
+  const q = normalizeSearchQuery(query);
+  if (!q) return { videos: [], nextPageToken: '' };
+  const token = opts.pageToken || '';
+
+  return cached<YtSearchPage>(`search:v:${q}|${token}`, TTL.search, opts.force, async () => {
+    // search.list を叩いたあとで videos.list が足りなくなって100ユニットを無駄にしないよう、先に合計を確認する
+    const ids = await cached<{ ids: string[]; next: string }>(`search:ids:${q}|${token}`, TTL.search, opts.force, async () => {
+      await assertQuotaFor(SEARCH_UNITS_PER_PAGE);
+      const data = await callApi('search', {
+        part: 'snippet',
+        type: 'video',
+        videoCategoryId: MUSIC_CATEGORY_ID,
+        videoEmbeddable: 'true',
+        regionCode: 'JP',
+        maxResults: 25,
+        q,
+        pageToken: token || undefined,
+      });
+      const list: string[] = (data.items || []).map((it: any) => it?.id?.videoId).filter((v: unknown): v is string => typeof v === 'string' && !!v);
+      return { ids: list, next: typeof data.nextPageToken === 'string' ? data.nextPageToken : '' };
+    });
+
+    const videos = ids.ids.length ? await getVideos(ids.ids) : [];
+    const kept = videos.filter((v) => v.embeddable && v.durationSec >= SEARCH_MIN_SEC && v.durationSec <= SEARCH_MAX_SEC);
+    return { videos: kept, nextPageToken: ids.next };
+  });
+}
+
+/**
+ * チャンネルを名前で探す（「チャンネルを検索」ボタンを押したときだけ）。
+ * API消費の見積もり: search.list 100ユニット（キャッシュ有効の24時間は 0ユニット）。
+ */
+export async function searchChannels(query: string, opts: { force?: boolean } = {}): Promise<YtChannelHit[]> {
+  requireUserKey();
+  const q = normalizeSearchQuery(query);
+  if (!q) return [];
+  return cached<YtChannelHit[]>(`search:c:${q}`, TTL.search, opts.force, async () => {
+    const data = await callApi('search', { part: 'snippet', type: 'channel', maxResults: 5, q });
+    const out: YtChannelHit[] = [];
+    for (const it of data.items || []) {
+      const id = it?.id?.channelId || it?.snippet?.channelId;
+      if (typeof id !== 'string' || !id) continue;
+      out.push({ id, title: it.snippet?.title || '', thumbnail: pickThumb(it.snippet?.thumbnails) });
+    }
+    return out;
+  });
+}
+
+/**
+ * APIキーの動作確認（videos.list を1回 = 1ユニット）。key を省略すると、保存済みの自分のキーを確認する。
+ * 使える: true / 拒否された: false。上限・通信エラーなど、判断できないときは YoutubeApiError を投げる。
+ * キーはログにもエラー文にも出さない。
+ */
+export async function verifyYoutubeApiKey(key?: string): Promise<boolean> {
+  const typed = (key || '').trim();
+  if (!typed && getYoutubeApiKeySource() !== 'user') {
+    throw reportError(new YoutubeApiError('NO_KEY', '確認するキーがありません。'));
+  }
+  try {
+    await callApi('videos', { part: 'id', id: 'jNQXAC9IVRw', maxResults: 1 }, typed || undefined);
+    return true;
+  } catch (e) {
+    if (e instanceof YoutubeApiError && e.code === 'KEY_REJECTED') return false;
+    throw e;
+  }
 }

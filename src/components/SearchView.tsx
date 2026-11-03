@@ -14,6 +14,7 @@ import {
 import { usePlayer } from '../context/PlayerContext';
 import { MusicTrack } from '../types/music';
 import { PageHeader } from './PageHeader';
+import { YoutubeSearchResults } from './YoutubeSearchResults';
 
 // 「カテゴリを見る」のタイルの色（ミュージックの検索画面のような、はっきりした色）
 const TILE_GRADIENTS = [
@@ -304,6 +305,9 @@ export const SearchView: React.FC<SearchViewProps> = ({ onSelectArtist }) => {
               </div>
             )}
           </div>
+
+          {/* YouTube全体の検索（ボタンを押したときだけ。入力のたびには呼ばない） */}
+          <YoutubeSearchResults query={query} centered={searchResults.length === 0} />
         </div>
       ) : (
         /* DEFAULT EMPTY SEARCH: EXPLORE ARTISTS & POPULAR GENRES */

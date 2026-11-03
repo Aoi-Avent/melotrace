@@ -3,8 +3,8 @@
 // 読めない・古い・壊れている場合は null を返し、棚は表示されない（アプリ全体には影響しない）。
 import { useEffect, useState } from 'react';
 import type { MusicTrack } from '../types/music';
-import { classifyMusicGenre, extractSmartTrackMeta } from './parser';
 import { normalizeName, splitArtistNames } from './textMatch';
+import { buildCatalogTrack } from './videoToTrack';
 
 interface ChartsFile {
   version: number;
@@ -24,19 +24,7 @@ const MIN_ITEMS = 3;
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 
 function toTrack(it: ChartsFile['items'][number]): MusicTrack {
-  const meta = extractSmartTrackMeta(it.title, it.artist || '');
-  return {
-    id: it.id,
-    title: meta.cleanTitle || it.title,
-    artist: meta.cleanArtist || it.artist,
-    channelId: it.channelId,
-    genre: classifyMusicGenre(it.title, it.artist || ''),
-    playCount: 0,
-    duration: it.duration ?? null,
-    lastPlayed: '',
-    isFavorite: false,
-    thumbnailUrl: `https://i.ytimg.com/vi/${it.id}/hqdefault.jpg`,
-  };
+  return buildCatalogTrack({ id: it.id, title: it.title, channelTitle: it.artist, channelId: it.channelId, durationSec: it.duration });
 }
 
 export async function loadCharts(): Promise<ChartsData | null> {

@@ -40,6 +40,7 @@ import { saveTextFile } from '../utils/nativeFile';
 import { isNativeApp } from '../utils/platform';
 import { ThumbSettings } from './ThumbSettings';
 import { YoutubeUsageNote } from './YoutubeUsageNote';
+import { YoutubeApiKeyCard, peekKeyCardRequest } from './YoutubeApiKeyCard';
 import { YoutubeUrlImport } from './YoutubeUrlImport';
 
 const GITHUB_ACTIONS_WORKFLOW_YAML = `name: Deploy to GitHub Pages
@@ -344,7 +345,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
   };
 
   // 「色テーマ」「同期」以外は、高度な設定にまとめる（最初のデータ取り込み前は、迷わないよう開いておく）
-  const [advancedOpen, setAdvancedOpen] = useState<boolean>(() => isDemoMode || activeTracks.length === 0);
+  const [advancedOpen, setAdvancedOpen] = useState<boolean>(() => isDemoMode || activeTracks.length === 0 || peekKeyCardRequest());
 
   const handleCopyWorkflow = async () => {
     try {
@@ -397,6 +398,8 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
       <AppearanceCard />
 
       <YoutubeUsageNote />
+
+      <YoutubeApiKeyCard />
 
       {!isNativeApp() && <ExtensionGuideCard />}
 

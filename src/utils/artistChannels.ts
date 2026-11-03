@@ -46,6 +46,16 @@ function saveStored(map: Record<string, ArtistChannel>): void {
   }
 }
 
+/**
+ * 画面の外（検索結果など）から、アーティスト名とチャンネルの対応を端末内に保存する。
+ * 保存先は useArtistChannels と同じ（クラウド同期には含めない）。新着の棚は、次にホームを開いたときに反映される。
+ */
+export function saveArtistChannel(name: string, ch: ArtistChannel): void {
+  const k = normalizeName(name);
+  if (!k || !CHANNEL_ID_RE.test(ch.channelId)) return;
+  saveStored({ ...loadStored(), [k]: ch });
+}
+
 /** 曲の「アーティスト名（正規化）」が wanted に一致するものだけ、channelId を数える */
 function countChannels(tracks: MusicTrack[], wanted: Set<string>): Map<string, Map<string, number>> {
   const out = new Map<string, Map<string, number>>();
