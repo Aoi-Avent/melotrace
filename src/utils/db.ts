@@ -5,12 +5,15 @@
 import { MusicTrack, Playlist } from '../types/music';
 
 const DB_NAME = 'melotrace_db';
-const DB_VERSION = 2;
+// v3: 再生ログ用の新ストア play_log を追加するため（既存4ストアは contains 確認で作成済みのまま残る）
+const DB_VERSION = 3;
 const STORE_TRACKS = 'tracks';
 const STORE_PLAYLISTS = 'playlists';
 /** YouTube Data API のキャッシュと日次使用量（youtubeApi.ts 用。clearDB では消さない） */
 export const STORE_YT_CACHE = 'yt_cache';
 export const STORE_YT_USAGE = 'yt_usage';
+/** 再生ログ（playLog.ts 用。端末内のみ。全消去では消す） */
+export const STORE_PLAY_LOG = 'play_log';
 
 export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -33,6 +36,10 @@ export function openDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_YT_USAGE)) {
         db.createObjectStore(STORE_YT_USAGE, { keyPath: 'date' });
+      }
+      if (!db.objectStoreNames.contains(STORE_PLAY_LOG)) {
+        const log = db.createObjectStore(STORE_PLAY_LOG, { keyPath: 'id', autoIncrement: true });
+        log.createIndex('ts', 'ts', { unique: false });
       }
     };
 
@@ -165,9 +172,10 @@ export async function loadPlaylistsFromDB(): Promise<Playlist[] | null> {
 export async function clearDB(): Promise<void> {
   try {
     const db = await openDB();
-    const tx = db.transaction([STORE_TRACKS, STORE_PLAYLISTS], 'readwrite');
+    const tx = db.transaction([STORE_TRACKS, STORE_PLAYLISTS, STORE_PLAY_LOG], 'readwrite');
     tx.objectStore(STORE_TRACKS).clear();
     tx.objectStore(STORE_PLAYLISTS).clear();
+    tx.objectStore(STORE_PLAY_LOG).clear();
   } catch (err) {
     console.warn('clearDB failed:', err);
   }

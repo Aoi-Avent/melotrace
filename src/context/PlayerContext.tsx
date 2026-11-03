@@ -19,6 +19,7 @@ import { findAlbumArt, getCachedArt, forgetArt } from '../utils/albumArt';
 import { primeChime, startWaitChime } from '../utils/waitChime';
 import { getPref, usePref } from '../utils/uiPrefs';
 import { timeStore } from '../utils/timeStore';
+import { appendPlayLog } from '../utils/playLog';
 import { contentSignature, hashString, decideSync, SyncBase, SyncMode, ApplyState } from '../utils/syncMerge';
 import {
   GOOGLE_CLIENT_ID,
@@ -1423,6 +1424,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const playTrack = useCallback(
     (track: MusicTrack, newQueue?: MusicTrack[], shouldOpenModal: boolean = false) => {
+      // 再生ログ（端末内）。ラジオ曲も残す。直前の曲の秒数もここで確定する（setCurrentTime(0) より前に呼ぶ必要がある）
+      appendPlayLog(track.id, track.isRadio ? 'radio' : persistTracksRef.current.some((t) => t.id === track.id) ? 'library' : 'other');
       // ラジオ: 別の曲・別のリストを選んだら止める（自動で次へ進む／いまのキュー内の曲を選ぶ場合は続ける）
       if (radioSeedRef.current) {
         const cur = queueRef.current;
