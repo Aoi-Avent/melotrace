@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Heart, BadgeCheck, Star, ChevronRight } from 'lucide-react';
 import { PageHeader } from './PageHeader';
 import { usePlayer } from '../context/PlayerContext';
@@ -52,7 +52,8 @@ export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOn
   const artists: ArtistSummary[] = useMemo(() => {
     const map = new Map<string, ArtistSummary>();
     for (const t of musicTracks) {
-      const name = t.artist || '(不明)';
+      if (!t) continue;
+      const name = typeof t.artist === 'string' && t.artist ? t.artist : t.artist ? String(t.artist) : '(不明)';
       let a = map.get(name);
       if (!a) {
         a = { name, trackCount: 0, totalPlayCount: 0, favoriteCount: 0, tracks: [], thumbnailUrl: undefined };
@@ -61,14 +62,17 @@ export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOn
       a.trackCount += 1;
       a.totalPlayCount += t.playCount || 0;
       if (t.isFavorite) a.favoriteCount += 1;
-      if (t.firstPlayed && (!a.firstPlayed || t.firstPlayed < a.firstPlayed)) a.firstPlayed = t.firstPlayed;
-      if (t.lastPlayed && (!a.lastPlayed || t.lastPlayed > a.lastPlayed)) a.lastPlayed = t.lastPlayed;
+      const fp = t.firstPlayed ? String(t.firstPlayed) : '';
+      const lp = t.lastPlayed ? String(t.lastPlayed) : '';
+      if (fp && (!a.firstPlayed || fp < a.firstPlayed)) a.firstPlayed = fp;
+      if (lp && (!a.lastPlayed || lp > a.lastPlayed)) a.lastPlayed = lp;
       a.tracks.push(t);
     }
     // 代表サムネイル: 再生回数が最も多い曲
     map.forEach((a) => {
-      const top = [...a.tracks].sort((x, y) => (y.playCount || 0) - (x.playCount || 0))[0];
-      a.thumbnailUrl = top ? `https://img.youtube.com/vi/${top.id}/mqdefault.jpg` : undefined;
+      let top: MusicTrack | undefined;
+      for (const x of a.tracks) if (!top || (x.playCount || 0) > (top.playCount || 0)) top = x;
+      a.thumbnailUrl = top && top.id ? `https://img.youtube.com/vi/${top.id}/mqdefault.jpg` : undefined;
     });
     return Array.from(map.values());
   }, [musicTracks]);
@@ -76,7 +80,7 @@ export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOn
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = favOnly ? artists.filter((a) => favSet.has(a.name)) : artists;
-    const filtered = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
+    const filtered = q ? base.filter((a) => String(a.name).toLowerCase().includes(q)) : base;
     const sign = dir === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       let c = 0;
@@ -104,6 +108,25 @@ export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOn
       return c !== 0 ? c * sign : collator.compare(a.name, b.name);
     });
   }, [artists, query, sortKey, dir, favOnly, favSet]);
+  // 段階表示: 最初に60件、リスト末尾に来たら60件ずつ追加（全行一括描画を避ける）
+  const PAGE = 60;
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [query, sortKey, dir, favOnly]);
+  const shown = useMemo(() => list.slice(0, limit), [list, limit]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || limit >= list.length || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (ents) => {
+        if (ents.some((e) => e.isIntersecting)) setLimit((n) => n + PAGE);
+      },
+      { rootMargin: '600px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limit, list.length]);
+
   const favCount = useMemo(() => artists.filter((a) => favSet.has(a.name)).length, [artists, favSet]);
 
   const subtitle = (a: ArtistSummary) => {
@@ -149,7 +172,7 @@ export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOn
       </div>
 
       <div className="flex flex-col mt-stagger">
-        {list.map((a) => {
+        {shown.map((a) => {
           const verified = artistStatus(a.name) === 'verified';
           return (
             <div
@@ -198,6 +221,7 @@ export const ArtistsView: React.FC<{ favoritesOnly?: boolean }> = ({ favoritesOn
             </div>
           );
         })}
+        {limit < list.length && <div ref={sentinelRef} className="h-8" aria-hidden />}
         {list.length === 0 && (
           <p className="text-[14px] text-muted text-center py-16 px-6 leading-relaxed">
             {favOnly && !query

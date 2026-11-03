@@ -14,6 +14,7 @@ import { LibraryView } from './components/LibraryView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { DataImportView } from './components/DataImportView';
 import { ArtistsView } from './components/ArtistsView';
+import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { LibraryRoot } from './components/LibraryRoot';
 import { useNav, navSetTab, navBack, installChromeScroll } from './utils/nav';
 import { RetroPlayer } from './components/RetroPlayer';
@@ -213,8 +214,8 @@ const AppContent: React.FC = () => {
         {activeTab === 'library' && ['all', 'vocaloid', 'bgm', 'favorites', 'playlists'].includes(nav.lib) && (
           <LibraryView section={nav.lib as 'all' | 'vocaloid' | 'bgm' | 'favorites' | 'playlists'} />
         )}
-        {activeTab === 'library' && nav.lib === 'artists' && <ArtistsView />}
-        {activeTab === 'library' && nav.lib === 'favArtists' && <ArtistsView favoritesOnly />}
+        {activeTab === 'library' && nav.lib === 'artists' && <ViewErrorBoundary label="アーティスト"><ArtistsView /></ViewErrorBoundary>}
+        {activeTab === 'library' && nav.lib === 'favArtists' && <ViewErrorBoundary label="お気に入りのアーティスト"><ArtistsView favoritesOnly /></ViewErrorBoundary>}
         {activeTab === 'search' && (
           <SearchView onSelectArtist={(artist) => setSelectedArtistForDetail(artist)} />
         )}
