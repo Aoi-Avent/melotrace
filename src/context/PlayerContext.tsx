@@ -11,6 +11,7 @@ import { DEMO_TRACKS, DEMO_PLAYLISTS } from '../data/demoData';
 import { extractYouTubeId, extractSmartTrackMeta, isLikelyMusic, isBgmOrClassicalTrack } from '../utils/parser';
 import { getLyricsForTrack } from '../utils/lyricsService';
 import { audioKeepAlive } from '../utils/audioKeepAlive';
+import { normalizeName } from '../utils/textMatch';
 import { setupNativeBackgroundResume } from '../utils/nativeBackground';
 import { applyTheme, getSavedThemeId, THEME_STORAGE_KEY } from '../utils/theme';
 import { getStatus as getArtistStatus, needsCheck as artistNeedsCheck, verifyArtist, setOverride as setArtistOverrideStore } from '../utils/artistVerify';
@@ -1601,6 +1602,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setFavoriteArtists((prev) => (prev.includes(artist) ? prev.filter((a) => a !== artist) : [...prev, artist]));
   }, []);
 
+  /** まとめて追加（既に入っている名前は、表記ゆれも含めて重複させない） */
+  const addFavoriteArtists = useCallback((names: string[]) => {
+    setFavoriteArtists((prev) => {
+      const seen = new Set(prev.map((a) => normalizeName(a)));
+      const added: string[] = [];
+      for (const n of names) {
+        const key = normalizeName(n);
+        if (!n || !key || seen.has(key)) continue;
+        seen.add(key);
+        added.push(n);
+      }
+      return added.length > 0 ? [...prev, ...added] : prev;
+    });
+  }, []);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_FAV_ARTISTS, JSON.stringify(favoriteArtists));
@@ -2148,6 +2164,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         unbanArtist,
         favoriteArtists,
         toggleFavoriteArtist,
+        addFavoriteArtists,
         banTrack,
         unbanTrack,
         clearAllBans,

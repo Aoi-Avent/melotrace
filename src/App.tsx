@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { PlayerProvider, usePlayer } from './context/PlayerContext';
 import { AppChrome } from './components/AppChrome';
 import { NowPlayingModal } from './components/NowPlayingModal';
+import { ArtistOnboarding } from './components/ArtistOnboarding';
 import { HomeView } from './components/HomeView';
 import { RadioView } from './components/RadioView';
 import { LibraryView } from './components/LibraryView';
@@ -228,6 +229,9 @@ const AppContent: React.FC = () => {
 
       {/* Apple Music Full-Screen Now Playing Modal Sheet */}
       <NowPlayingModal />
+
+      {/* 初回だけの「好きなアーティストを選ぶ」（設定からも開ける） */}
+      <ArtistOnboarding />
 
       <Mascot />
       {!isNativeApp() && <AdTip onOpen={() => navSetTab('import')} />}

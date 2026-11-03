@@ -43,6 +43,7 @@ export interface PlayerContextType {
   unbanArtist: (artist: string) => void;
   favoriteArtists: string[];
   toggleFavoriteArtist: (artist: string) => void;
+  addFavoriteArtists: (names: string[]) => void;
   banTrack: (trackId: string) => void;
   unbanTrack: (trackId: string) => void;
   clearAllBans: () => void;

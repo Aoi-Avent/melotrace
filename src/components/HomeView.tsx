@@ -18,6 +18,8 @@ import { ActiveTab, QuickMixItem } from '../types/music';
 import { QUICK_MIXES } from '../data/quickMixes';
 import { BackgroundPlayButton } from './BackgroundGuide';
 import { ChartsShelf } from './ChartsShelf';
+import { RecommendedShelf } from './RecommendedShelf';
+import { useCharts, pickByArtists } from '../utils/charts';
 
 interface HomeViewProps {
   setActiveTab: (tab: ActiveTab) => void;
@@ -31,6 +33,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab }) => {
     currentTrack,
     isPlaying,
     isDemoMode,
+    favoriteArtists,
     playTrack,
     playBgmStation,
     togglePlay,
@@ -43,6 +46,19 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab }) => {
 
   const tracks = musicTracks.length > 0 ? musicTracks : activeTracks;
   const [isMixesExpanded, setIsMixesExpanded] = useState(false);
+
+  // 「あなたへのおすすめ」: チャートのうち、選んだアーティストの曲（チャートの棚には同じ曲を出さない）
+  const charts = useCharts();
+  const recommended = useMemo(
+    () => (charts ? pickByArtists(charts.tracks, favoriteArtists, 12) : []),
+    [charts, favoriteArtists]
+  );
+  const recommendedIds = useMemo(() => new Set(recommended.map((t) => t.id)), [recommended]);
+  const chartRanks = useMemo(
+    () => new Map((charts?.tracks ?? []).map((t, i) => [t.id, i + 1] as [string, number])),
+    [charts]
+  );
+  const chartsShelfVisible = !!charts && charts.tracks.some((t) => !recommendedIds.has(t.id));
 
   const totalPlays = useMemo(() => {
     return activeTracks.reduce((acc, t) => acc + t.playCount, 0);
@@ -122,6 +138,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab }) => {
           <h2 className="text-base font-bold text-fg mb-1">音楽データがありません</h2>
           <p className="text-xs text-muted mb-4 leading-relaxed">
             サンプルデータを読み込むか、Google Takeoutの履歴ファイルを取り込んで始めましょう。
+            {chartsShelfVisible && (
+              <>
+                <br />
+                下の人気の音楽から、気になる曲を追加して始められます
+              </>
+            )}
           </p>
           <div className="flex flex-col gap-2">
             <button
@@ -183,7 +205,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ setActiveTab }) => {
       )}
 
       {/* 人気の音楽（日本）: charts.json が無ければ非表示 */}
-      <ChartsShelf />
+      <RecommendedShelf tracks={recommended} ranks={chartRanks} />
+      <ChartsShelf charts={charts} excludeIds={recommendedIds} />
 
       {/* QUICK MIXES (Expanded to 24 with pull-down toggle) */}
       <section className="mb-8">

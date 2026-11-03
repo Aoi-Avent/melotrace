@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import type { MusicTrack } from '../types/music';
 import { classifyMusicGenre, extractSmartTrackMeta } from './parser';
+import { normalizeName, splitArtistNames } from './textMatch';
 
 interface ChartsFile {
   version: number;
@@ -56,11 +57,15 @@ export async function loadCharts(): Promise<ChartsData | null> {
   }
 }
 
+// 同じ起動中は1回だけ読み込む（ホームの棚とオンボーディングで共有）
+let chartsPromise: Promise<ChartsData | null> | null = null;
+
 export function useCharts(): ChartsData | null {
   const [charts, setCharts] = useState<ChartsData | null>(null);
   useEffect(() => {
     let alive = true;
-    loadCharts().then((c) => {
+    if (!chartsPromise) chartsPromise = loadCharts();
+    chartsPromise.then((c) => {
       if (alive) setCharts(c);
     });
     return () => {
@@ -68,4 +73,18 @@ export function useCharts(): ChartsData | null {
     };
   }, []);
   return charts;
+}
+
+/** チャートの曲のうち、選んだ（お気に入りの）アーティストの曲だけを返す */
+export function pickByArtists(tracks: MusicTrack[], artists: string[], max: number): MusicTrack[] {
+  if (artists.length === 0) return [];
+  const wanted = new Set(artists.map((a) => normalizeName(a)).filter(Boolean));
+  const out: MusicTrack[] = [];
+  for (const t of tracks) {
+    if (splitArtistNames(t.artist || '').some((n) => wanted.has(normalizeName(n)))) {
+      out.push(t);
+      if (out.length >= max) break;
+    }
+  }
+  return out;
 }

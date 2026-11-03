@@ -29,6 +29,7 @@ import { parseMhtmlToWatchHistory, MhtmlExtractionResult } from '../utils/mhtmlP
 import { MusicTrack, ActiveTab } from '../types/music';
 import { BackgroundPlayButton } from './BackgroundGuide';
 import { AccountCard } from './AccountCard';
+import { openArtistOnboarding } from './ArtistOnboarding';
 import { ThemePicker } from './ThemePicker';
 import { AppearanceCard } from './AppearanceCard';
 import { ExtensionGuideCard } from './ExtensionGuideCard';
@@ -362,6 +363,19 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
       <ThemePicker />
 
       <AccountCard />
+
+      <div className="mb-5 p-4 rounded-2xl apple-card flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-fg">好きなアーティスト</p>
+          <p className="text-[10px] text-muted mt-1 leading-relaxed">候補から選んで、お気に入りのアーティストに追加します。</p>
+        </div>
+        <button
+          onClick={openArtistOnboarding}
+          className="shrink-0 py-2 px-3.5 rounded-full bg-fg/10 hover:bg-fg/15 text-accent text-xs font-semibold active:scale-95 transition-all"
+        >
+          好きなアーティストを選び直す
+        </button>
+      </div>
 
       {/* 高度な設定（色テーマ・同期以外のすべて） */}
       <button
