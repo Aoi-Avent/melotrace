@@ -42,6 +42,7 @@ import {
   Radio,
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
+import { useSheetDrag } from '../hooks/useSheetDrag';
 import { setVideoFullscreen } from '../utils/videoFullscreen';
 import { isNativeApp } from '../utils/platform';
 import { isIOSDevice } from '../utils/deviceMode';
@@ -215,60 +216,10 @@ export const NowPlayingModal: React.FC = () => {
   };
 
   // 再生画面を、上から下へのスワイプで閉じる（指に追従して下がり、離すと閉じるか元に戻る）
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const dragRef = useRef<{ x: number; y: number; t: number; axis: 'v' | 'n' | null; dy: number }>({ x: 0, y: 0, t: 0, axis: null, dy: 0 });
-  const closingRef = useRef(false);
-  const closeWithAnimation = () => {
-    if (closingRef.current) return;
-    closingRef.current = true;
-    setDragging(false);
-    setDragY(window.innerHeight);
-    window.setTimeout(() => {
-      setIsNowPlayingOpen(false);
-      setDragY(0);
-      closingRef.current = false;
-    }, 260);
-  };
-  const finishDrag = () => {
-    const d = dragRef.current;
-    if (d.axis !== 'v') {
-      d.axis = null;
-      return;
-    }
-    const vel = d.dy / Math.max(1, performance.now() - d.t);
-    d.axis = null;
-    if (d.dy > 120 || (d.dy > 40 && vel > 0.5)) closeWithAnimation();
-    else {
-      setDragging(false);
-      setDragY(0);
-    }
-  };
-  const dragProps = {
-    onTouchStart: (e: React.TouchEvent) => {
-      if (closingRef.current || e.touches.length !== 1) return;
-      const t = e.touches[0];
-      dragRef.current = { x: t.clientX, y: t.clientY, t: performance.now(), axis: null, dy: 0 };
-    },
-    onTouchMove: (e: React.TouchEvent) => {
-      const d = dragRef.current;
-      if (closingRef.current || d.axis === 'n') return;
-      const t = e.touches[0];
-      const dx = t.clientX - d.x;
-      const dy = t.clientY - d.y;
-      if (d.axis === null) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        // 縦（下向き）が主なら、閉じる操作。それ以外（横スライドなど）は何もしない
-        d.axis = Math.abs(dy) > Math.abs(dx) && dy > 0 ? 'v' : 'n';
-        if (d.axis !== 'v') return;
-        setDragging(true);
-      }
-      d.dy = Math.max(0, dy);
-      setDragY(d.dy);
-    },
-    onTouchEnd: finishDrag,
-    onTouchCancel: finishDrag,
-  };
+  const { sheetRef, dragProps, close: closeWithAnimation } = useSheetDrag({
+    visible: isNowPlayingOpen && !!currentTrack,
+    onClosed: () => setIsNowPlayingOpen(false),
+  });
 
   // 「…」メニューのプレイリスト操作
   const [plEditMode, setPlEditMode] = useState(false);
@@ -481,11 +432,8 @@ export const NowPlayingModal: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#000000] flex flex-col justify-between overflow-hidden animate-in fade-in slide-in-from-bottom duration-300 mt-sheet"
-      style={{
-        transform: `translateY(${dragY}px)`,
-        transition: dragging ? 'none' : 'transform 0.26s cubic-bezier(0.22, 0.8, 0.2, 1)',
-      }}
+      ref={sheetRef}
+      className="fixed inset-0 z-50 bg-[#000000] flex flex-col justify-between overflow-hidden"
     >
       {/* Apple Music 風の背景: ジャケットの色をぼかして全体に敷く */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden select-none mt-ambient">
@@ -1306,7 +1254,7 @@ export const NowPlayingModal: React.FC = () => {
               onClick={() => {
                 setShowMoreMenu(false);
                 setIsRetroPlayerOpen(true);
-                setIsNowPlayingOpen(false);
+                closeWithAnimation();
               }}
               className={sheetBtn}
             >
