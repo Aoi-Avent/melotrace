@@ -24,7 +24,7 @@ const MiniCapsule: React.FC<{ compact?: boolean }> = ({ compact }) => {
       onClick={() => setIsNowPlayingOpen(true)}
       className={`lg-glass flex items-center gap-3 h-[54px] rounded-full pl-2 pr-2 cursor-pointer active:scale-[0.985] transition-transform ${compact ? 'flex-1 min-w-0' : ''}`}
     >
-      <div className="w-[38px] h-[38px] rounded-[9px] overflow-hidden shrink-0 bg-surface-2 flex items-center justify-center">
+      <div className="w-[38px] h-[38px] rounded-full overflow-hidden shrink-0 bg-surface-2 flex items-center justify-center">
         {!imgError ? (
           <img
             src={album ? album.url : `https://img.youtube.com/vi/${currentTrack.id}/mqdefault.jpg`}
