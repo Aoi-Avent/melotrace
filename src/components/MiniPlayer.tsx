@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Play, Pause, SkipForward, Disc3, Loader2 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { WaitIndicator, WaitBar } from './WaitIndicator';
+import { MarqueeTitle } from './MarqueeTitle';
 import { usePlayerTime } from '../utils/timeStore';
 
 export const MiniPlayer: React.FC = () => {
@@ -62,9 +63,7 @@ export const MiniPlayer: React.FC = () => {
           {/* Track metadata */}
           <div className="flex-1 min-w-0 pr-1">
             <div className="flex items-center gap-1.5 truncate">
-              <h4 className="text-xs font-semibold text-fg truncate leading-tight tracking-tight">
-                {currentTrack.title}
-              </h4>
+              <MarqueeTitle as="h4" title={currentTrack.title} className="min-w-0 flex-1 text-xs font-semibold text-fg leading-tight tracking-tight" />
               <WaitIndicator compact className="shrink-0" />
             </div>
             <p

@@ -23,10 +23,14 @@ function motionDisabled(): boolean {
 interface MarqueeTitleProps {
   title: string;
   compact?: boolean;
+  /** 指定すると文字サイズ・色などの見た目クラスを丸ごと置き換える（ミニプレーヤー用） */
+  className?: string;
+  as?: 'h2' | 'h4';
 }
 
-export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = false }) => {
+export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = false, className, as = 'h2' }) => {
   const ref = useRef<HTMLHeadingElement>(null);
+  const Tag = as;
   const aRef = useRef<HTMLSpanElement>(null);
   const gapRef = useRef<HTMLSpanElement>(null);
   const bRef = useRef<HTMLSpanElement>(null);
@@ -196,14 +200,14 @@ export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = fal
   }, [title]);
 
   return (
-    <h2
+    <Tag
       ref={ref}
-      className={`${compact ? 'text-[17px]' : 'text-[22px]'} font-semibold text-white leading-tight tracking-tight relative whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+      className={`${className ?? `${compact ? 'text-[17px]' : 'text-[22px]'} font-semibold text-white leading-tight tracking-tight`} relative whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
     >
       <span ref={aRef} className="inline-block">{title}</span>
       <span ref={gapRef} aria-hidden="true" className="hidden" style={{ width: `${GAP_EM}em` }} />
       <span ref={bRef} aria-hidden="true" className="hidden select-none">{title}</span>
-    </h2>
+    </Tag>
   );
 };
 
