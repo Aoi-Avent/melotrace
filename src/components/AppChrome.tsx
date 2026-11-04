@@ -3,6 +3,7 @@ import { House, Radio, Library, Search, Play, Pause, FastForward, Loader2, Disc3
 import type { ActiveTab } from '../types/music';
 import { usePlayer } from '../context/PlayerContext';
 import { WaitIndicator } from './WaitIndicator';
+import { MarqueeTitle } from './MarqueeTitle';
 import { useNav, navSetTab, parentTab, useCompactChrome } from '../utils/nav';
 
 const TABS: { id: ActiveTab; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }[] = [
@@ -40,7 +41,7 @@ const MiniCapsule: React.FC<{ compact?: boolean }> = ({ compact }) => {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <p className="text-[14px] font-semibold text-fg truncate leading-tight">{currentTrack.title}</p>
+          <MarqueeTitle as="p" title={currentTrack.title} className="min-w-0 flex-1 text-[14px] font-semibold text-fg leading-tight" />
           <WaitIndicator compact className="shrink-0" />
         </div>
         {!compact && <p className="text-[12px] text-muted truncate leading-tight mt-0.5">{currentTrack.artist}</p>}

@@ -25,12 +25,12 @@ interface MarqueeTitleProps {
   compact?: boolean;
   /** 指定すると文字サイズ・色などの見た目クラスを丸ごと置き換える（ミニプレーヤー用） */
   className?: string;
-  as?: 'h2' | 'h4';
+  as?: 'h2' | 'h4' | 'p';
 }
 
 export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = false, className, as = 'h2' }) => {
   const ref = useRef<HTMLHeadingElement>(null);
-  const Tag = as;
+  const Tag = as as React.ElementType;
   const aRef = useRef<HTMLSpanElement>(null);
   const gapRef = useRef<HTMLSpanElement>(null);
   const bRef = useRef<HTMLSpanElement>(null);
