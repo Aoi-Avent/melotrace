@@ -151,6 +151,23 @@ export async function readPlayLogPage(limit: number, beforeTs?: number | null): 
   }
 }
 
+/** ローカルの year 年1年分の行を読む（古い順）。IndexedDB のみ・YouTube API 消費 0。 */
+export async function readPlayLogYear(year: number): Promise<PlayLogRow[]> {
+  try {
+    const db = await openDB();
+    const index = db.transaction(STORE_PLAY_LOG, 'readonly').objectStore(STORE_PLAY_LOG).index('ts');
+    const range = IDBKeyRange.bound(new Date(year, 0, 1).getTime(), new Date(year + 1, 0, 1).getTime(), false, true);
+    return await new Promise<PlayLogRow[]>((resolve, reject) => {
+      const req = index.getAll(range);
+      req.onsuccess = () => resolve((req.result as PlayLogRow[]) || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (err) {
+    console.warn('readPlayLogYear failed:', err);
+    return [];
+  }
+}
+
 /** 1本のトランザクションで、条件に合う行を古い順に最大 max 件消す（max 省略で全部） */
 async function deleteOldest(range: IDBKeyRange | null, max?: number): Promise<void> {
   const db = await openDB();
