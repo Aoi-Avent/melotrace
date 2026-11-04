@@ -6,7 +6,9 @@ import { applyThumbPrefs, loadThumbPrefs } from './utils/thumbPrefs';
 import { applyUiPrefs } from './utils/uiMode';
 import { initNative } from './utils/nativeInit';
 import { schedulePlayLogPrune } from './utils/playLog';
+import { initChunkReload } from './utils/chunkReload';
 
+initChunkReload();
 initViewportFix();
 applyThumbPrefs(loadThumbPrefs());
 applyUiPrefs();
