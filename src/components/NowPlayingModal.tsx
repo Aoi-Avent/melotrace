@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { useSheetDrag } from '../hooks/useSheetDrag';
+import { openRecovery } from '../utils/recoveryUi';
 import { setVideoFullscreen } from '../utils/videoFullscreen';
 import { isNativeApp } from '../utils/platform';
 import { isIOSDevice } from '../utils/deviceMode';
@@ -1282,6 +1283,16 @@ export const NowPlayingModal: React.FC = () => {
               <ExternalLink className="w-4 h-4" />
               <span>YouTubeで開く</span>
             </a>
+            <button
+              onClick={() => {
+                setShowMoreMenu(false);
+                openRecovery();
+              }}
+              className={sheetBtn}
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>再生の復旧</span>
+            </button>
           </div>
         </div>
       )}

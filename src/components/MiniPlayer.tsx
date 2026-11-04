@@ -33,9 +33,9 @@ export const MiniPlayer: React.FC = () => {
         className="max-w-lg mx-auto relative overflow-hidden rounded-2xl apple-pill-miniplayer cursor-pointer active:scale-[0.985] transition-all"
       >
         <WaitBar />
-        <div className="flex items-center gap-3 p-2">
+        <div className="flex items-center gap-3 py-2 pl-2.5 pr-2">
           {/* Thumbnail */}
-          <div className="relative w-11 h-11 rounded-xl overflow-hidden shrink-0 bg-surface-2 border border-fg/10 shadow-sm flex items-center justify-center">
+          <div className="relative w-11 h-11 rounded-full overflow-hidden shrink-0 bg-surface-2 border border-fg/10 shadow-sm flex items-center justify-center">
             {!imgError ? (
               <img
                 src={album ? album.url : `https://img.youtube.com/vi/${currentTrack.id}/mqdefault.jpg`}
@@ -51,7 +51,7 @@ export const MiniPlayer: React.FC = () => {
 
             {/* Micro equalizing bar indicator when playing real music */}
             {isPlaying && !isAdPlaying && (
-              <div className="absolute inset-0 bg-black/30 flex items-end justify-center gap-[2px] pb-1.5">
+              <div className="absolute inset-0 rounded-full bg-black/30 flex items-center justify-center gap-[2px]">
                 <span className="w-[2.5px] bg-fg rounded-full apple-eq-bar-1" />
                 <span className="w-[2.5px] bg-fg rounded-full apple-eq-bar-2" />
                 <span className="w-[2.5px] bg-fg rounded-full apple-eq-bar-3" />

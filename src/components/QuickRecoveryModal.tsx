@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { loadTracksFromDB } from '../utils/db';
+import { useRecoveryOpen, openRecovery, closeRecovery } from '../utils/recoveryUi';
 
 export const QuickRecoveryModal: React.FC = () => {
   const {
@@ -24,7 +25,8 @@ export const QuickRecoveryModal: React.FC = () => {
     activeTracks,
   } = usePlayer();
 
-  const [isOpen, setIsOpen] = useState(false);
+  const isOpen = useRecoveryOpen();
+  const setIsOpen = (v: boolean) => (v ? openRecovery() : closeRecovery());
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [dbCount, setDbCount] = useState<number | null>(null);
 
@@ -52,10 +54,9 @@ export const QuickRecoveryModal: React.FC = () => {
 
   return (
     <>
-      {/* Discreet floating recovery trigger in top header area */}
-      <div className="fixed top-[max(env(safe-area-inset-top,0px),8px)] right-3 z-40 flex items-center gap-1.5">
-        {/* If audio is playing but muted by browser autoplay policy, show prominent 1-tap unmute button */}
-        {isPlaying && isPlayerMuted && (
+      {/* 右上: 音声が止まっているときだけ出るミュート解除ボタン（復旧は再生画面の「…」メニューへ移動） */}
+      {isPlaying && isPlayerMuted && (
+        <div className="fixed top-[max(env(safe-area-inset-top,0px),8px)] right-3 z-40 flex items-center gap-1.5">
           <button
             onClick={handleUnmute}
             className="px-2.5 py-1 rounded-full bg-amber-500/90 text-black text-[11px] font-bold flex items-center gap-1 shadow-lg shadow-amber-500/30 animate-pulse active:scale-95 transition-all"
@@ -64,17 +65,8 @@ export const QuickRecoveryModal: React.FC = () => {
             <VolumeX className="w-3.5 h-3.5" />
             <span>音声を有効化</span>
           </button>
-        )}
-
-        <button
-          onClick={() => setIsOpen(true)}
-          className="p-1.5 rounded-full bg-fg/10 hover:bg-fg/20 text-muted hover:text-fg border border-fg/10 active:scale-90 transition-all shadow-sm"
-          title="アプリの復旧・再読み込みメニュー"
-          aria-label="復旧メニュー"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-      </div>
+        </div>
+      )}
 
       {/* Toast Notification */}
       {toastMsg && (
