@@ -20,6 +20,8 @@ import { primeChime, startWaitChime } from '../utils/waitChime';
 import { getPref, usePref } from '../utils/uiPrefs';
 import { timeStore } from '../utils/timeStore';
 import { appendPlayLog } from '../utils/playLog';
+import { restoreResume, type ResumeRestore } from '../utils/resumeState';
+import { useResumePersistence } from '../hooks/useResumePersistence';
 import { contentSignature, hashString, decideSync, SyncBase, SyncMode, ApplyState } from '../utils/syncMerge';
 import {
   GOOGLE_CLIENT_ID,
@@ -173,8 +175,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [selectedArtistForDetail, setSelectedArtistForDetail] = useState<string | null>(null);
 
+  // 前回の曲・位置・キュー（resume）。使えなければ null で、従来の復元（LAST_TRACK_ID / LAST_QUEUE_IDS）に戻る
+  const resumeRef = useRef<ResumeRestore | null | undefined>(undefined);
+  const getResume = (): ResumeRestore | null => {
+    if (resumeRef.current === undefined) resumeRef.current = restoreResume({ tracks, bannedTracks, bannedArtists });
+    return resumeRef.current;
+  };
+
   // Restore last playing track or default to first music track
   const [currentTrack, setCurrentTrack] = useState<MusicTrack | null>(() => {
+    const rs = getResume();
+    if (rs) return rs.track;
     try {
       const lastId = localStorage.getItem(STORAGE_KEY_LAST_TRACK_ID);
       if (lastId) {
@@ -191,6 +202,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Restore last queue or default to music tracks
   const [queue, setQueue] = useState<MusicTrack[]>(() => {
+    const rs = getResume();
+    if (rs) return rs.queue;
     try {
       const lastQueueIds = localStorage.getItem(STORAGE_KEY_LAST_QUEUE_IDS);
       if (lastQueueIds) {
@@ -209,7 +222,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return musicTracks.length > 0 ? musicTracks : activeTracks;
   });
 
-  const [queueIndex, setQueueIndex] = useState<number>(0);
+  // 復元した曲が復元したキューの何番目か（「次の曲」がずれないように）
+  const [queueIndex, setQueueIndex] = useState<number>(() => {
+    const i = currentTrack ? queue.findIndex((t) => t.id === currentTrack.id) : -1;
+    return i >= 0 ? i : 0;
+  });
+  // 復元した位置。最初の再生（resumePlayback）で一度だけ使う。自動再生はしない
+  const resumeStartRef = useRef<{ id: string; sec: number } | null>(
+    resumeRef.current && resumeRef.current.seconds > 0 ? { id: resumeRef.current.track.id, sec: resumeRef.current.seconds } : null
+  );
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   // 再生位置・長さは専用の保管場所（timeStore）に置く。ここで state にすると、動くたびにアプリ全体が描き直される
   const setCurrentTime = timeStore.setCurrentTime;
@@ -519,6 +540,16 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       } catch (e) {}
     }
   }, [queue]);
+
+  // 再生位置などの保存（10秒ごと／一時停止／背面／曲の変更）と、復元位置のミニプレーヤー表示
+  useResumePersistence({
+    track: currentTrack,
+    queue,
+    isPlaying,
+    libraryTracks: tracks,
+    playerRef: ytPlayerRef,
+    initial: resumeRef.current ? { seconds: resumeRef.current.seconds, duration: resumeRef.current.track.duration } : null,
+  });
 
   // Automatic real lyrics fetch for current track if missing
   useEffect(() => {
@@ -1014,6 +1045,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     wantPlayingRef.current = true;
     setPlaybackHint(null);
     const p = ytPlayerRef.current;
+    // 復元した位置からの最初の再生: その位置から読み込む（再生ログはここで初めて書く）
+    const rs = resumeStartRef.current;
+    const cur = currentTrackRef.current;
+    resumeStartRef.current = null;
+    if (rs && cur && rs.id === cur.id) {
+      appendPlayLog(cur.id, cur.isRadio ? 'radio' : persistTracksRef.current.some((t) => t.id === cur.id) ? 'library' : 'other');
+      lastTimeRef.current = rs.sec;
+      loadedAtRef.current = Date.now();
+      if (p?.loadVideoById) {
+        try {
+          p.unMute?.();
+          p.setVolume?.(userVolumeRef.current);
+          p.loadVideoById({ videoId: cur.id, startSeconds: rs.sec });
+          p.playVideo?.();
+        } catch (e) {}
+      } else {
+        pendingTrackRef.current = cur;
+        pendingStartRef.current = rs.sec;
+      }
+    } else
     try {
       p?.unMute?.();
       p?.setVolume?.(userVolumeRef.current);
@@ -1426,6 +1477,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     (track: MusicTrack, newQueue?: MusicTrack[], shouldOpenModal: boolean = false) => {
       // 再生ログ（端末内）。ラジオ曲も残す。直前の曲の秒数もここで確定する（setCurrentTime(0) より前に呼ぶ必要がある）
       appendPlayLog(track.id, track.isRadio ? 'radio' : persistTracksRef.current.some((t) => t.id === track.id) ? 'library' : 'other');
+      resumeStartRef.current = null; // 別の曲を選んだら、復元位置は使わない
       // ラジオ: 別の曲・別のリストを選んだら止める（自動で次へ進む／いまのキュー内の曲を選ぶ場合は続ける）
       if (radioSeedRef.current) {
         const cur = queueRef.current;
@@ -1653,6 +1705,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const seekTo = useCallback((sec: number) => {
     setCurrentTime(sec);
+    // 復元後の最初の再生の前にシークしたら、その位置から始める
+    if (resumeStartRef.current) resumeStartRef.current = { ...resumeStartRef.current, sec };
     if (ytPlayerRef.current?.seekTo) {
       try {
         ytPlayerRef.current.seekTo(sec, true);
