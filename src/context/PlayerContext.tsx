@@ -1426,6 +1426,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         const current = p.getCurrentTime();
         const dur = p.getDuration();
+        learnTrackDuration(dur);
         if (typeof current === 'number' && !isNaN(current)) {
           setCurrentTime((prev) => (Math.abs(prev - current) < 0.2 ? prev : current));
           // 再生が進まないまま固まっていないかを監視（バックグラウンド中は対象外）
@@ -1478,6 +1479,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [isPlaying, pollMs, evaluateAd, applyAdState, recordMetricIfReady, logEvent, recreatePlayer]);
 
   radioLatestRef.current = { musicTracks, charts: chartsData?.tracks ?? [], bannedTracks, bannedArtists, strictness: strictnessMode };
+
+  // 長さが未取得の曲は、再生中のプレーヤーが教えてくれた長さを保存する（API呼び出しなし・広告中は対象外）。
+  // これで「短い曲を除外」が、いちど再生した曲にも効くようになる。
+  const learnedDurRef = useRef<Set<string>>(new Set());
+  const learnTrackDuration = useCallback((dur: unknown) => {
+    const t = currentTrackRef.current;
+    if (!t || typeof dur !== 'number' || !(dur > 5) || !Number.isFinite(dur)) return;
+    if (learnedDurRef.current.has(t.id)) return;
+    learnedDurRef.current.add(t.id);
+    const sec = Math.round(dur);
+    setTracks((prev) => prev.map((x) => (x.id === t.id && !(x.duration && x.duration > 0) ? { ...x, duration: sec } : x)));
+  }, []);
 
   const playTrack = useCallback(
     (track: MusicTrack, newQueue?: MusicTrack[], shouldOpenModal: boolean = false) => {
