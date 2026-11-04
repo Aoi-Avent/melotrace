@@ -53,10 +53,13 @@ export function saveResume(args: {
     if (!ids.includes(track.id)) ids.unshift(track.id);
     const byId = new Map<string, MusicTrack>(q.map((t) => [t.id, t]));
     byId.set(track.id, byId.get(track.id) ?? track);
+    // 起動直後はライブラリの一部（先頭300曲）しか読めていないので、ライブラリの曲かどうかに関係なく、
+    // いまの曲の前後30件はスナップショットを持つ。復元時はライブラリにあればそちらを優先する。
+    // （libraryIds は将来の使い分け用に受け取るだけで、保存の可否には使わない）
+    const ci = Math.max(0, ids.indexOf(track.id));
+    const start = Math.max(0, ci - 5);
     const snapshots: TrackSnapshot[] = [];
-    for (const id of ids) {
-      if (snapshots.length >= MAX_SNAPSHOTS) break;
-      if (libraryIds.has(id)) continue;
+    for (const id of ids.slice(start, start + MAX_SNAPSHOTS)) {
       const t = byId.get(id);
       if (!t) continue;
       snapshots.push({ id: t.id, title: t.title, artist: t.artist, thumbnailUrl: t.thumbnailUrl, duration: t.duration ?? null });
