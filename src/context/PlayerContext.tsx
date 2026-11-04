@@ -55,6 +55,7 @@ import { isRadioRefillDue, replaceUpcomingWithRadio, shouldShuffleNext } from '.
 import { readCachedNewReleases } from '../utils/newReleases';
 import { useCharts } from '../utils/charts';
 import { useShortFilterSec, filterShort, getShortFilterSec } from '../utils/shortFilter';
+import { publishPlayerState } from '../utils/playerCover';
 
 export type { PlayMetric };
 
@@ -1235,6 +1236,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               // 1: PLAYING, 2: PAUSED, 0: ENDED, 3: BUFFERING, -1: UNSTARTED, 5: CUED
               const p = ytPlayerRef.current;
               logEvent(`状態 ${event.data}`);
+              publishPlayerState(event.data);
               if (event.data === 1) {
                 // 字幕は常にオフにする（YouTubeアカウント側の設定で自動表示されるのを防ぐ）
                 try {

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, X } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { setVideoFullscreen } from '../utils/videoFullscreen';
+import { usePlayerCoverInput, shouldCover } from '../utils/playerCover';
 
 interface VideoOverlayProps {
   /** 埋め込みプレーヤーと同じ位置・大きさに重ねるための指定 */
@@ -20,6 +21,7 @@ export const VideoOverlay: React.FC<VideoOverlayProps> = ({ className, style, fu
   const { currentTrack, isPlaying, isAdPlaying, togglePlay } = usePlayer();
   const [showControls, setShowControls] = useState(true);
   const hideTimer = useRef<number | undefined>(undefined);
+  const real = usePlayerCoverInput();
 
   const poke = () => {
     setShowControls(true);
@@ -34,7 +36,7 @@ export const VideoOverlay: React.FC<VideoOverlayProps> = ({ className, style, fu
 
   if (!currentTrack) return null;
 
-  const covered = !isPlaying && !isAdPlaying;
+  const covered = shouldCover(isPlaying, isAdPlaying, real.state, real.started);
   const controlsVisible = fullscreen && showControls && !isAdPlaying;
 
   return (
