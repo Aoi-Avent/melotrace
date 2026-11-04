@@ -13,7 +13,7 @@ import {
 import { usePlayer } from '../context/PlayerContext';
 
 export const AnalyticsView: React.FC = () => {
-  const { activeTracks: tracks, playTrack, isDemoMode } = usePlayer();
+  const { historyTracks: tracks, playTrack, isDemoMode } = usePlayer();
 
   // Basic stats
   const totalPlays = useMemo(() => {

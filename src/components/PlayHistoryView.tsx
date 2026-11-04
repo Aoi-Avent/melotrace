@@ -36,7 +36,7 @@ function groupLabel(date: string, today: string, yesterday: string): string {
 }
 
 export const PlayHistoryView: React.FC = () => {
-  const { activeTracks, playTrack, albumArtFor, artworkSource } = usePlayer();
+  const { historyTracks: activeTracks, playTrack, albumArtFor, artworkSource } = usePlayer();
   const [logRows, setLogRows] = useState<PlayLogRow[]>([]);
   const [logDone, setLogDone] = useState(false);
   const [oldestTs, setOldestTs] = useState<number | null | undefined>(undefined); // undefined=読み込み前

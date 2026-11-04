@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { usePlayer } from '../context/PlayerContext';
 import { useCharts } from '../utils/charts';
+import { useShortFiltered } from '../utils/shortFilter';
 import { useArtistChannels } from '../utils/artistChannels';
 import { useNewReleases } from '../utils/newReleases';
 import { ChartCard } from './ChartCard';
@@ -21,7 +22,8 @@ export const NewReleasesShelf: React.FC = () => {
 
   const { linked, unresolved, link } = useArtistChannels(favoriteArtists, library, charts?.tracks ?? []);
   const targets = useMemo(() => linked.map((l) => ({ channelId: l.channelId, name: l.name })), [linked]);
-  const { tracks, error } = useNewReleases(targets, strictnessMode);
+  const { tracks: allNew, error } = useNewReleases(targets, strictnessMode);
+  const tracks = useShortFiltered(allNew); // 長さ不明は除外しない
   const inLibrary = useMemo(() => new Set(library.map((t) => t.id)), [library]);
 
   if (favoriteArtists.length === 0) return null;

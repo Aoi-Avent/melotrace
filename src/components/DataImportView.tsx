@@ -31,6 +31,7 @@ import { BackgroundPlayButton } from './BackgroundGuide';
 import { AccountCard } from './AccountCard';
 import { openArtistOnboarding } from './ArtistOnboarding';
 import { ThemePicker } from './ThemePicker';
+import { ShortTrackFilterCard } from './ShortTrackFilterCard';
 import { AppearanceCard } from './AppearanceCard';
 import { ExtensionGuideCard } from './ExtensionGuideCard';
 import { ArtistFilterToggle } from './ArtistFilterToggle';
@@ -362,6 +363,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
       <PageHeader title="設定" onBack subtitle="色テーマ・同期・取り込みなど" />
 
       <ThemePicker />
+      <ShortTrackFilterCard />
 
       <AccountCard />
 

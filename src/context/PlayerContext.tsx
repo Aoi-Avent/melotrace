@@ -54,6 +54,7 @@ import { buildRadioBatch } from '../utils/radio';
 import { isRadioRefillDue, replaceUpcomingWithRadio, shouldShuffleNext } from '../utils/radioQueue';
 import { readCachedNewReleases } from '../utils/newReleases';
 import { useCharts } from '../utils/charts';
+import { useShortFilterSec, filterShort, getShortFilterSec } from '../utils/shortFilter';
 
 export type { PlayMetric };
 
@@ -150,7 +151,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [verifyProgress, setVerifyProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
 
   // Active unbanned tracks
-  const activeTracks = useMemo(() => {
+  const shortSec = useShortFilterSec();
+  const historyTracks = useMemo(() => {
     const bannedT = new Set(bannedTracks);
     const bannedA = new Set(bannedArtists);
     const officialOnly = artistFilterMode === 'official';
@@ -162,6 +164,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // verifyVersion: 判定結果が増えたら再計算する
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks, bannedTracks, bannedArtists, artistFilterMode, verifyVersion]);
+
+  // 短い曲の除外は表示・再生候補の段階だけ（データは消さない）。履歴・分析・年間まとめは historyTracks を使う
+  const activeTracks = useMemo(() => filterShort(historyTracks, shortSec), [historyTracks, shortSec]);
+  const historyMusicTracks = useMemo(() => historyTracks.filter((t) => !isBgmOrClassicalTrack(t)), [historyTracks]);
 
   // Pure music tracks (EXCLUDES Free BGM, Classical & Sleep soundscapes)
   const musicTracks = useMemo(() => {
@@ -1615,7 +1621,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const batch = await buildRadioBatch(seed, {
           library: lt.musicTracks,
           charts: lt.charts,
-          newReleases: readCachedNewReleases(),
+          newReleases: filterShort(readCachedNewReleases(), getShortFilterSec()),
           recentIds: recent,
           unplayable: unplayableRef.current,
           isBlocked: (t) => bt.has(t.id) || ba.has(t.artist),
@@ -2314,6 +2320,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       value={{
         tracks,
         activeTracks,
+        historyTracks,
+        historyMusicTracks,
         musicTracks,
         bgmTracks,
         playlists,

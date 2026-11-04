@@ -17,6 +17,9 @@ declare global {
 export interface PlayerContextType {
   tracks: MusicTrack[];
   activeTracks: MusicTrack[];
+  /** 短い曲の除外を適用しない一覧（分析・再生履歴・年間まとめ用） */
+  historyTracks: MusicTrack[];
+  historyMusicTracks: MusicTrack[];
   musicTracks: MusicTrack[];
   bgmTracks: MusicTrack[];
   playlists: Playlist[];

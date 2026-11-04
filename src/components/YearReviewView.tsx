@@ -24,7 +24,7 @@ function fmtDate(d: string): string {
 }
 
 export const YearReviewView: React.FC = () => {
-  const { musicTracks, albumArtFor, artworkSource } = usePlayer();
+  const { historyMusicTracks: musicTracks, albumArtFor, artworkSource } = usePlayer();
   const thisYear = new Date().getFullYear();
 
   const [logYears, setLogYears] = useState<number[] | null>(null); // null=読み込み前

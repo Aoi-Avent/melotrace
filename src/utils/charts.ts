@@ -1,10 +1,11 @@
 // 「人気の音楽（日本）」の棚で使う charts.json の読み込み。
 // JSON は GitHub Actions が1日1回生成する（scripts/fetch-charts.mjs）。ブラウザからAPIは叩かない。
 // 読めない・古い・壊れている場合は null を返し、棚は表示されない（アプリ全体には影響しない）。
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MusicTrack } from '../types/music';
 import { normalizeName, splitArtistNames } from './textMatch';
 import { buildCatalogTrack } from './videoToTrack';
+import { useShortFilterSec, filterShort } from './shortFilter';
 
 interface ChartsFile {
   version: number;
@@ -49,7 +50,10 @@ export async function loadCharts(): Promise<ChartsData | null> {
 let chartsPromise: Promise<ChartsData | null> | null = null;
 
 export function useCharts(): ChartsData | null {
-  const [charts, setCharts] = useState<ChartsData | null>(null);
+  const [raw, setCharts] = useState<ChartsData | null>(null);
+  const shortSec = useShortFilterSec();
+  // 長さ不明のチャート曲は除外しない（追加のAPI呼び出しなし）
+  const charts = useMemo(() => (raw ? { ...raw, tracks: filterShort(raw.tracks, shortSec) } : raw), [raw, shortSec]);
   useEffect(() => {
     let alive = true;
     if (!chartsPromise) chartsPromise = loadCharts();

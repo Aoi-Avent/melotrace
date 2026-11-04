@@ -1,3 +1,4 @@
+import { useShortFiltered } from '../utils/shortFilter';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Loader2, Plus, Search as SearchIcon, Star } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
@@ -55,13 +56,15 @@ export const YoutubeSearchResults: React.FC<Props> = ({ query, centered }) => {
   const q = normalizeSearchQuery(query);
   const shown = found && found.q === q ? found : null;
 
-  const tracks = useMemo(
+  const allTracks = useMemo(
     () =>
       (shown?.videos ?? []).map((v) =>
         buildCatalogTrack({ id: v.id, title: v.title, channelTitle: v.channelTitle, channelId: v.channelId, durationSec: v.durationSec }),
       ),
     [shown],
   );
+  const tracks = useShortFiltered(allTracks); // 長さ不明は除外しない
+  const trackById = useMemo(() => new Map(tracks.map((t) => [t.id, t])), [tracks]);
   const inLibrary = useMemo(() => new Set(library.map((t) => t.id)), [library]);
   const favKeys = useMemo(() => new Set(favoriteArtists.map((a) => normalizeName(a))), [favoriteArtists]);
 
@@ -136,7 +139,7 @@ export const YoutubeSearchResults: React.FC<Props> = ({ query, centered }) => {
       {shown && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-sm font-bold text-fg tracking-tight">YouTubeの検索結果 ({shown.videos.length})</h2>
+            <h2 className="text-sm font-bold text-fg tracking-tight">YouTubeの検索結果 ({tracks.length})</h2>
             <span className="text-[10px] text-muted">今日の検索はあと約{remaining}回</span>
           </div>
 
@@ -144,7 +147,7 @@ export const YoutubeSearchResults: React.FC<Props> = ({ query, centered }) => {
 
           <div className="divide-y divide-fg/5">
             {shown.videos.map((v, i) => {
-              const track = tracks[i];
+              const track = trackById.get(v.id);
               if (!track) return null;
               const added = inLibrary.has(v.id);
               const isFav = favKeys.has(normalizeName(track.artist)) || (!!v.channelId && savedChannels.has(v.channelId));
