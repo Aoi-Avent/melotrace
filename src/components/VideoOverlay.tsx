@@ -36,7 +36,9 @@ export const VideoOverlay: React.FC<VideoOverlayProps> = ({ className, style, fu
 
   if (!currentTrack) return null;
 
-  const covered = shouldCover(isPlaying, isAdPlaying, real.state, real.started);
+  const covered = shouldCover(isPlaying, isAdPlaying, real.state, real.started, real.seeking);
+  // 一時停止中は覆わず、止まった動画をそのまま見せる（再生ボタンだけ重ねる）
+  const showPlayButton = (!isPlaying && !isAdPlaying) || covered;
   const controlsVisible = fullscreen && showControls && !isAdPlaying;
 
   return (
@@ -63,7 +65,7 @@ export const VideoOverlay: React.FC<VideoOverlayProps> = ({ className, style, fu
             <div className="absolute inset-0 bg-black/40" />
           </>
         )}
-        {(covered || controlsVisible) && (
+        {(showPlayButton || controlsVisible) && (
           <button
             onClick={(e: { stopPropagation: () => void }) => {
               e.stopPropagation();

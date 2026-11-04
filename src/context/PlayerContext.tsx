@@ -55,7 +55,7 @@ import { isRadioRefillDue, replaceUpcomingWithRadio, shouldShuffleNext } from '.
 import { readCachedNewReleases } from '../utils/newReleases';
 import { useCharts } from '../utils/charts';
 import { useShortFilterSec, filterShort, getShortFilterSec } from '../utils/shortFilter';
-import { publishPlayerState } from '../utils/playerCover';
+import { publishPlayerState, markSeek } from '../utils/playerCover';
 
 export type { PlayMetric };
 
@@ -1730,6 +1730,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (resumeStartRef.current) resumeStartRef.current = { ...resumeStartRef.current, sec };
     if (ytPlayerRef.current?.seekTo) {
       try {
+        markSeek();
         ytPlayerRef.current.seekTo(sec, true);
       } catch (e) {
         // ignore
