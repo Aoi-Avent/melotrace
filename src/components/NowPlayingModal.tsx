@@ -58,6 +58,7 @@ import {
 } from '../utils/lyricsService';
 import { LyricLine } from '../types/music';
 import { WaitIndicator } from './WaitIndicator';
+import { MarqueeTitle } from './MarqueeTitle';
 import { formatTime, formatRemainingTime, sheetBtn, sheetChip, ytThumbChain } from './nowPlayingHelpers';
 import { ManualLyricsModal, LyricsSearchModal } from './LyricsModals';
 import { usePlayerTime } from '../utils/timeStore';
@@ -403,9 +404,7 @@ export const NowPlayingModal: React.FC = () => {
         />
       )}
       <div key={currentTrack.id} className="min-w-0 flex-1 animate-in fade-in slide-in-from-bottom-1 duration-300">
-        <h2 className={`${compact ? 'text-[17px]' : 'text-[22px]'} font-semibold text-white truncate leading-tight tracking-tight`}>
-          {currentTrack.title}
-        </h2>
+        <MarqueeTitle title={currentTrack.title} compact={compact} />
         <button
           onClick={() => setSelectedArtistForDetail(currentTrack.artist)}
           className={`${compact ? 'text-[17px]' : 'text-[22px]'} text-white/55 truncate max-w-full text-left leading-tight block`}
