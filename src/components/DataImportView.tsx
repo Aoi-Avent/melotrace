@@ -40,6 +40,7 @@ import { unzipSync } from 'fflate';
 import { saveTextFile } from '../utils/nativeFile';
 import { isNativeApp } from '../utils/platform';
 import { ThumbSettings } from './ThumbSettings';
+import { UpdateCard } from './UpdateButton';
 import { YoutubeUsageNote } from './YoutubeUsageNote';
 import { YoutubeApiKeyCard, peekKeyCardRequest } from './YoutubeApiKeyCard';
 import { YoutubeUrlImport } from './YoutubeUrlImport';
@@ -396,6 +397,7 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
         <BackgroundPlayButton compact className="mb-5" />
 
       <ThumbSettings />
+      <UpdateCard />
 
       <AppearanceCard />
 

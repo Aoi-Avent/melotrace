@@ -2,11 +2,12 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
+import {buildVersionPlugin} from './vite-plugin-build-version';
 
 export default defineConfig(() => {
   return {
     base: './',
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), buildVersionPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

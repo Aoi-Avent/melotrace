@@ -31,6 +31,7 @@ import { DesktopModeBanner } from './components/DesktopModeBanner';
 import { SearchView } from './components/SearchView';
 import { ArtistDetailModal } from './components/ArtistDetailModal';
 import { QuickRecoveryModal } from './components/QuickRecoveryModal';
+import { UpdateBanner } from './components/UpdateButton';
 import { VideoOverlay } from './components/VideoOverlay';
 import { useVideoFullscreen, setVideoFullscreen } from './utils/videoFullscreen';
 import { ActiveTab } from './types/music';
@@ -232,6 +233,7 @@ const AppContent: React.FC = () => {
 
       {/* Global Quick Recovery & Audio Resync */}
       <QuickRecoveryModal />
+      <UpdateBanner />
 
 
       {/* Apple Music Full-Screen Now Playing Modal Sheet */}
