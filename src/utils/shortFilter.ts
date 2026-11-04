@@ -2,7 +2,7 @@ import { useMemo, useSyncExternalStore } from 'react';
 
 /** 「短い曲を除外」。端末内のみ（localStorage）。クラウド同期には載せない。曲のデータは消さず、表示・再生候補の段階で外す。 */
 export const SHORT_FILTER_KEY = 'melotrace_short_filter_v1';
-export const SHORT_FILTER_OPTIONS = [0, 20, 30, 60, 90] as const; // 0 = オフ
+export const SHORT_FILTER_OPTIONS = [0, 20, 30, 60, 90, 120, 150, 180] as const; // 0 = オフ
 
 /** duration が null・undefined・0以下（長さ不明）は false（除外しない）。minSec<=0 はオフ。 */
 export function isShortTrack(duration: number | null | undefined, minSec: number): boolean {
