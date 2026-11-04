@@ -8,9 +8,9 @@ import React, { useEffect, useRef } from 'react';
 
 const SPEED_PX_PER_SEC = 30;
 const WAIT_START_MS = 2000;
-const WAIT_END_MS = 1500;
-const WAIT_RESET_MS = 2000;
 const RESUME_AFTER_TOUCH_MS = 3000;
+/** 曲名の終わりと次の先頭の間の空白（半角スペース約8個ぶん） */
+const GAP_EM = 2.2;
 
 /** useSheetDrag.ts と同じ判定（アプリ内アニメーションOFF・省電力・視差効果を減らす） */
 function motionDisabled(): boolean {
@@ -27,10 +27,16 @@ interface MarqueeTitleProps {
 
 export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = false }) => {
   const ref = useRef<HTMLHeadingElement>(null);
+  const aRef = useRef<HTMLSpanElement>(null);
+  const gapRef = useRef<HTMLSpanElement>(null);
+  const bRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    const a = aRef.current;
+    const gap = gapRef.current;
+    const b = bRef.current;
+    if (!el || !a || !gap || !b) return;
     el.scrollLeft = 0; // 曲が変わったら先頭から
 
     let raf = 0;
@@ -38,14 +44,22 @@ export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = fal
     let last = 0;
     let pos = 0; // 自動スクロール中の小数位置
     let expected = 0; // 自動で最後にセットした scrollLeft（ユーザー操作との区別用）
-    let phase: 'start' | 'move' | 'end' | 'reset' = 'start';
+    let phase: 'start' | 'move' = 'start';
     let phaseLeft = WAIT_START_MS;
     let touching = false;
     let resumeAt = 0; // この時刻まで自動スクロール停止
     let userMoved = false;
 
-    const maxScroll = () => Math.max(0, el.scrollWidth - el.clientWidth);
-    const canAuto = () => !motionDisabled() && !document.hidden && maxScroll() > 1;
+    // 曲名単体が枠より広いときだけ「流す」。広いときだけ 空白＋2つ目の曲名 を表示する
+    const overflows = () => a.offsetWidth - el.clientWidth > 1;
+    const syncCopy = () => {
+      const d = overflows() ? 'inline-block' : 'none';
+      gap.style.display = d;
+      b.style.display = d;
+    };
+    // 1周ぶんの長さ（曲名＋空白）。ここまで進むと2つ目が先頭と同じ見た目になる
+    const period = () => b.offsetLeft - a.offsetLeft;
+    const canAuto = () => !motionDisabled() && !document.hidden && overflows();
 
     const stop = () => {
       running = false;
@@ -71,25 +85,23 @@ export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = fal
         userMoved = false;
         pos = el.scrollLeft;
         expected = pos;
-        if (pos >= maxScroll() - 1) { phase = 'end'; phaseLeft = WAIT_END_MS; }
-        else if (pos <= 1) { phase = 'start'; phaseLeft = WAIT_START_MS; }
+        if (pos <= 1) { phase = 'start'; phaseLeft = WAIT_START_MS; }
         else phase = 'move';
       }
-      const max = maxScroll();
+      const loop = period();
       if (phase === 'move') {
-        pos = Math.min(max, pos + (SPEED_PX_PER_SEC * dt) / 1000);
+        pos += (SPEED_PX_PER_SEC * dt) / 1000;
+        if (pos >= loop) {
+          // 2つ目の曲名が先頭に来たので、見た目を変えずに位置を戻してループ。先頭で少し止まる
+          pos = 0;
+          phase = 'start';
+          phaseLeft = WAIT_START_MS;
+        }
         el.scrollLeft = pos;
         expected = el.scrollLeft;
-        if (pos >= max) { phase = 'end'; phaseLeft = WAIT_END_MS; }
       } else {
         phaseLeft -= dt;
-        if (phaseLeft <= 0) {
-          if (phase === 'start') phase = 'move';
-          else if (phase === 'end') {
-            pos = 0; el.scrollLeft = 0; expected = el.scrollLeft;
-            phase = 'reset'; phaseLeft = WAIT_RESET_MS;
-          } else { phase = 'move'; }
-        }
+        if (phaseLeft <= 0) phase = 'move';
       }
       raf = requestAnimationFrame(tick);
     };
@@ -118,6 +130,13 @@ export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = fal
     };
     // 自動で動かした分（expected と一致）は無視し、それ以外はユーザー操作とみなす
     const onScroll = () => {
+      // 手動でも途切れなくループ：1周ぶんを超えたら見た目を変えずに戻す
+      const loop = period();
+      if (overflows() && loop > 0 && el.scrollLeft >= loop) {
+        el.scrollLeft -= loop;
+        expected = el.scrollLeft;
+        return;
+      }
       if (Math.abs(el.scrollLeft - expected) > 1.5) {
         userMoved = true;
         resumeAt = performance.now() + RESUME_AFTER_TOUCH_MS;
@@ -138,11 +157,16 @@ export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = fal
 
     // 収まるか／収まらないかを測る。収まらなければ開始、収まれば停止
     const ro = new ResizeObserver(() => {
-      if (maxScroll() > 1) start();
-      else stop();
+      syncCopy();
+      if (overflows()) start();
+      else {
+        stop();
+        el.scrollLeft = 0;
+      }
     });
+    syncCopy();
     ro.observe(el);
-    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    ro.observe(a);
 
     // 設定（アニメーションOFF等）が切り替わったら追従
     const mq = typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -174,9 +198,11 @@ export const MarqueeTitle: React.FC<MarqueeTitleProps> = ({ title, compact = fal
   return (
     <h2
       ref={ref}
-      className={`${compact ? 'text-[17px]' : 'text-[22px]'} font-semibold text-white leading-tight tracking-tight whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+      className={`${compact ? 'text-[17px]' : 'text-[22px]'} font-semibold text-white leading-tight tracking-tight relative whitespace-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
     >
-      <span className="inline-block">{title}</span>
+      <span ref={aRef} className="inline-block">{title}</span>
+      <span ref={gapRef} aria-hidden="true" className="hidden" style={{ width: `${GAP_EM}em` }} />
+      <span ref={bRef} aria-hidden="true" className="hidden select-none">{title}</span>
     </h2>
   );
 };
