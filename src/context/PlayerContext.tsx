@@ -1702,7 +1702,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (ytPlayerRef.current?.pauseVideo) {
           ytPlayerRef.current.pauseVideo();
         }
-        audioKeepAlive.onPause();
+        audioKeepAlive.onPause({ immediate: true });
         setIsPlaying(false);
         setSleepTimerMinutes(null);
       }, minutes * 60 * 1000);
@@ -1892,6 +1892,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue([]);
     setCurrentTrack(null);
     setIsPlaying(false);
+    audioKeepAlive.onPause({ immediate: true });
     setIsDemoMode(false);
     clearDB();
     localStorage.removeItem(STORAGE_KEY_TRACKS);

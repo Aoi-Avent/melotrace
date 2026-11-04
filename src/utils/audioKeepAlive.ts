@@ -11,6 +11,9 @@ import { MusicTrack } from '../types/music';
 
 const KEEPALIVE_KEY = 'melotrace_keepalive_v1';
 
+/** 一時停止後も無音ループを残す時間（ms）。経過後にループを止める。既定30分 */
+export const PAUSED_KEEPALIVE_MS = 30 * 60 * 1000;
+
 /** 実際に無音サンプルを含む 1 秒の WAV（8bit/8kHz/モノラル）を生成する */
 function createSilentWavUrl(): string {
   const sampleRate = 8000;
@@ -40,6 +43,47 @@ function createSilentWavUrl(): string {
 class AudioKeepAliveService {
   private silentAudio: HTMLAudioElement | null = null;
   private artUrl: string | null = null;
+  private pausedAt: number | null = null; // 一時停止した時刻(ms)。猶予中のみ非null
+  private graceTimer: ReturnType<typeof setTimeout> | null = null;
+  private visListenerAttached = false;
+
+  private clearGrace() {
+    if (this.graceTimer) {
+      clearTimeout(this.graceTimer);
+      this.graceTimer = null;
+    }
+    this.pausedAt = null;
+  }
+
+  /** 経過時間で判定し、猶予切れならループを止める。未切れなら残り時間でタイマーを張り直す */
+  private checkGrace() {
+    if (this.pausedAt === null) return;
+    const elapsed = Date.now() - this.pausedAt;
+    if (elapsed >= PAUSED_KEEPALIVE_MS) {
+      this.clearGrace();
+      this.stopLoop();
+      return;
+    }
+    if (this.graceTimer) clearTimeout(this.graceTimer);
+    this.graceTimer = setTimeout(() => this.checkGrace(), PAUSED_KEEPALIVE_MS - elapsed);
+  }
+
+  private attachVisibilityListener() {
+    if (this.visListenerAttached || typeof document === 'undefined') return;
+    this.visListenerAttached = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') this.checkGrace();
+    });
+  }
+
+  /** 調査用ログ向けの状態 */
+  public getState(): { enabled: boolean; loopPlaying: boolean; pausedElapsedSec: number | null } {
+    return {
+      enabled: this.isEnabled(),
+      loopPlaying: !!this.silentAudio && !this.silentAudio.paused,
+      pausedElapsedSec: this.pausedAt === null ? null : Math.round((Date.now() - this.pausedAt) / 1000),
+    };
+  }
 
   /** アルバムジャケットがあれば、ロック画面などの画像に使う */
   public setArtwork(url: string | null) {
@@ -59,7 +103,10 @@ class AudioKeepAliveService {
     try {
       localStorage.setItem(KEEPALIVE_KEY, on ? 'on' : 'off');
     } catch (e) {}
-    if (!on) this.stopLoop();
+    if (!on) {
+      this.clearGrace();
+      this.stopLoop();
+    }
   }
 
   private ensureAudio() {
@@ -76,6 +123,7 @@ class AudioKeepAliveService {
   /** 曲が実際に再生され始めてから呼ぶ（再生開始前に別の音声を鳴らして競合させない） */
   public startLoop() {
     if (!this.isEnabled()) return;
+    this.clearGrace();
     this.ensureAudio();
     if (this.silentAudio && this.silentAudio.paused) {
       try {
@@ -95,6 +143,7 @@ class AudioKeepAliveService {
 
   /** メタデータ（ロック画面・コントロールセンター表示）のみ更新する */
   public onPlay(track: MusicTrack | null) {
+    this.clearGrace(); // 再生再開・曲の変更で猶予を解除
     if (track && 'mediaSession' in navigator) {
       try {
         navigator.mediaSession.metadata = new MediaMetadata({
@@ -112,8 +161,19 @@ class AudioKeepAliveService {
     }
   }
 
-  public onPause() {
-    this.stopLoop();
+  /**
+   * 一時停止。通常はループを PAUSED_KEEPALIVE_MS だけ残す（iOSにWebViewを凍結させないため）。
+   * immediate: true（スリープタイマー・明示的な停止）なら即座に止める。
+   */
+  public onPause(opts?: { immediate?: boolean }) {
+    this.clearGrace();
+    if (opts?.immediate || !this.isEnabled()) {
+      this.stopLoop();
+    } else {
+      this.attachVisibilityListener();
+      this.pausedAt = Date.now();
+      this.graceTimer = setTimeout(() => this.checkGrace(), PAUSED_KEEPALIVE_MS);
+    }
     if ('mediaSession' in navigator) {
       try {
         navigator.mediaSession.playbackState = 'paused';
@@ -151,6 +211,7 @@ class AudioKeepAliveService {
 
     try {
       navigator.mediaSession.setActionHandler('play', () => {
+        this.startLoop(); // 先にループを同期的に再開してから再生を再開する
         handlers.onPlay();
       });
 
