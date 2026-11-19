@@ -11,6 +11,7 @@ import { DEMO_TRACKS, DEMO_PLAYLISTS } from '../data/demoData';
 import { extractYouTubeId, extractSmartTrackMeta, isLikelyMusic, isBgmOrClassicalTrack } from '../utils/parser';
 import { getLyricsForTrack } from '../utils/lyricsService';
 import { audioKeepAlive } from '../utils/audioKeepAlive';
+import { mergeImportedTracks } from '../utils/importMerge';
 import { normalizeName } from '../utils/textMatch';
 import { setupNativeBackgroundResume } from '../utils/nativeBackground';
 import { applyTheme, getSavedThemeId, THEME_STORAGE_KEY } from '../utils/theme';
@@ -467,6 +468,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const persistTracksRef = useRef(tracks);
   persistTracksRef.current = tracks;
+  // importTracks（取り込みのマージ）から最新の値を読むための ref
+  const importPlaylistsRef = useRef(playlists);
+  importPlaylistsRef.current = playlists;
+  const importIsDemoRef = useRef(isDemoMode);
+  importIsDemoRef.current = isDemoMode;
   const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTracksRef = useRef<Map<string, MusicTrack>>(new Map());
   const flushTracks = useCallback(() => {
@@ -1864,55 +1870,61 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  const importTracks = useCallback((newTracks: MusicTrack[]) => {
-    if (!newTracks || newTracks.length === 0) return;
+  const importTracks = useCallback((newTracks: MusicTrack[]): { added: number; updated: number; unchanged: number } => {
+    const none = { added: 0, updated: 0, unchanged: 0 };
+    if (!newTracks || newTracks.length === 0) return none;
 
-    clearRadio();
-    setIsDemoMode(false);
-    setTracks(newTracks);
-    setQueue(newTracks);
-    setQueueIndex(0);
-    setCurrentTrack(newTracks[0]);
-    setCurrentTime(0);
-    setDuration(newTracks[0]?.duration || 210);
+    const current = persistTracksRef.current;
+    const replace = importIsDemoRef.current || current.length === 0;
+    const { tracks: merged, added, updated, unchanged } = mergeImportedTracks(current, newTracks, { isDemo: replace });
 
-    // Auto-create smart playlists
-    const genreMap = new Map<string, string[]>();
-    newTracks.forEach((t) => {
-      if (t.genre) {
-        const arr = genreMap.get(t.genre) || [];
-        arr.push(t.id);
-        genreMap.set(t.genre, arr);
-      }
-    });
-
-    const smartPlaylists: Playlist[] = [
-      {
-        id: 'pl_fav_' + Date.now(),
-        name: 'お気に入り・高リピート',
-        trackIds: newTracks.filter((t) => t.isFavorite || t.playCount >= 3).map((t) => t.id),
-        createdAt: new Date().toISOString().slice(0, 16),
-        updatedAt: new Date().toISOString().slice(0, 16),
-      },
-      ...Array.from(genreMap.entries())
-        .slice(0, 4)
-        .map(([g, ids]) => ({
-          id: `pl_${g}_${Date.now()}`,
-          name: `${g} セレクション`,
-          trackIds: ids.slice(0, 30),
-          createdAt: new Date().toISOString().slice(0, 16),
-          updatedAt: new Date().toISOString().slice(0, 16),
-        })),
-    ];
-    setPlaylists(smartPlaylists);
-
-    if (ytPlayerRef.current?.loadVideoById && newTracks[0]) {
-      try {
-        ytPlayerRef.current.loadVideoById(newTracks[0].id, 0);
-      } catch (e) {
-        // ignore
-      }
+    if (replace) {
+      // デモ／手元0件: 取り込み分で置き換え、先頭の曲をキューと再生中の曲にする（再生は始めない）
+      clearRadio();
+      setIsDemoMode(false);
+      setTracks(merged);
+      setQueue(merged);
+      setQueueIndex(0);
+      setCurrentTrack(merged[0]);
+      setCurrentTime(0);
+      setDuration(merged[0]?.duration || 210);
+    } else if (added > 0 || updated > 0) {
+      setTracks(merged); // 1回だけ。保存・同期は既存の保存処理に任せる
     }
+
+    // 自動プレイリストは、デモの置き換え時か、プレイリストが1本もないときだけ
+    if (importIsDemoRef.current || importPlaylistsRef.current.length === 0) {
+      const genreMap = new Map<string, string[]>();
+      merged.forEach((t) => {
+        if (t.genre) {
+          const arr = genreMap.get(t.genre) || [];
+          arr.push(t.id);
+          genreMap.set(t.genre, arr);
+        }
+      });
+      const stamp = new Date().toISOString().slice(0, 16);
+      const smartPlaylists: Playlist[] = [
+        {
+          id: 'pl_fav_' + Date.now(),
+          name: 'お気に入り・高リピート',
+          trackIds: merged.filter((t) => t.isFavorite || t.playCount >= 3).map((t) => t.id),
+          createdAt: stamp,
+          updatedAt: stamp,
+        },
+        ...Array.from(genreMap.entries())
+          .slice(0, 4)
+          .map(([g, ids]) => ({
+            id: `pl_${g}_${Date.now()}`,
+            name: `${g} セレクション`,
+            trackIds: ids.slice(0, 30),
+            createdAt: stamp,
+            updatedAt: stamp,
+          })),
+      ];
+      setPlaylists(smartPlaylists);
+    }
+
+    return { added, updated, unchanged };
   }, []);
 
   const addSingleTrackByUrl = useCallback(

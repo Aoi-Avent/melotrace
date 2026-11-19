@@ -67,7 +67,8 @@ export interface PlayerContextType {
   toggleFavorite: (trackId: string) => void;
   setIsNowPlayingOpen: (open: boolean) => void;
   loadDemoData: () => void;
-  importTracks: (newTracks: MusicTrack[]) => void;
+  /** 取り込みは「いまのデータに追加（マージ）」。件数を返す */
+  importTracks: (newTracks: MusicTrack[]) => { added: number; updated: number; unchanged: number };
   addSingleTrackByUrl: (urlOrId: string, customTitle?: string, customArtist?: string) => boolean;
   /** 再生を始めずにライブラリへ追加する（既存の曲は上書きせず、新しい曲だけ先頭に足す） */
   appendTracks: (newTracks: MusicTrack[]) => void;

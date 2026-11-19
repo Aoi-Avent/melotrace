@@ -45,6 +45,9 @@ import { YoutubeUsageNote } from './YoutubeUsageNote';
 import { YoutubeApiKeyCard, peekKeyCardRequest } from './YoutubeApiKeyCard';
 import { YoutubeUrlImport } from './YoutubeUrlImport';
 
+const countLine = (r: { added: number; updated: number; unchanged: number }) =>
+  ` 追加${r.added.toLocaleString()}曲・更新${r.updated.toLocaleString()}曲・変更なし${r.unchanged.toLocaleString()}曲`;
+
 const GITHUB_ACTIONS_WORKFLOW_YAML = `name: Deploy to GitHub Pages
 
 on:
@@ -189,9 +192,9 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
   // Import extracted MHTML tracks to library
   const handleImportMhtmlTracks = () => {
     if (mhtmlExtractedTracks.length === 0) return;
-    importTracks(mhtmlExtractedTracks);
+    const r = importTracks(mhtmlExtractedTracks);
     setImportResult(
-      `MHTMLから${mhtmlExtractedTracks.length.toLocaleString()}曲をライブラリに取り込みました！IndexedDBに永続保存されました。`
+      `MHTMLから${mhtmlExtractedTracks.length.toLocaleString()}曲をライブラリに取り込みました！IndexedDBに永続保存されました。${countLine(r)}`
     );
   };
 
@@ -229,8 +232,8 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
           await new Promise((r) => setTimeout(r, 30));
         }
         if (zipTracks.length > 0) {
-          importTracks(zipTracks);
-          setImportResult(`ZIPから ${zipTracks.length.toLocaleString()}曲を取り込みました。`);
+          const r = importTracks(zipTracks);
+          setImportResult(`ZIPから ${zipTracks.length.toLocaleString()}曲を取り込みました。${countLine(r)}`);
         } else {
           setErrorMessage('音楽データが検出されませんでした。');
         }
@@ -304,9 +307,9 @@ export const DataImportView: React.FC<DataImportViewProps> = ({ setActiveTab }) 
       await new Promise((r) => setTimeout(r, 50));
 
       if (extractedTracks.length > 0) {
-        importTracks(extractedTracks);
+        const r = importTracks(extractedTracks);
         setImportResult(
-          `インポート成功！${extractedTracks.length.toLocaleString()}曲の音楽・ボカロ・カバー楽曲を抽出・保存しました。高速IndexedDBに安全保管されているため、次回以降もフリーズせずスムーズに操作できます。`
+          `インポート成功！${extractedTracks.length.toLocaleString()}曲の音楽・ボカロ・カバー楽曲を抽出・保存しました。高速IndexedDBに安全保管されているため、次回以降もフリーズせずスムーズに操作できます。${countLine(r)}`
         );
       } else {
         setErrorMessage(
